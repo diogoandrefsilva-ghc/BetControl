@@ -582,25 +582,30 @@ function revParse(txt){
   const out=$('#revOut');
   if(!rows.length){ out.innerHTML='<p style="color:var(--neg);font-size:13px">CSV vazio.</p>'; return; }
   const head=rows[0].map(h=>h.trim().toLowerCase());
-  const ix=n=>head.findIndex(h=>h===n);
-  const iAmount=ix('amount'), iDesc=ix('description');
-  const iComp=ix('completed date'), iStart=ix('started date'), iState=ix('state');
-  if(iAmount<0||iDesc<0){ out.innerHTML='<p style="color:var(--neg);font-size:13px">Não parece um extrato Revolut (faltam colunas Amount/Description).</p>'; return; }
-  const have=new Set(S.movs.map(m=>m.data+'|'+m.casa+'|'+m.tipo+'|'+(+m.valor).toFixed(2)));
+  const col=cands=>head.findIndex(h=>cands.some(c=>h.includes(c)));
+  const iAmount=col(['montante','amount']);            // PT / EN
+  const iDesc  =col(['descri','description']);
+  const iStart =col(['início','inicio','started','start date']);
+  const iComp  =col(['conclus','completed']);
+  const iState =col(['estado','state']);
+  if(iAmount<0||iDesc<0){ out.innerHTML='<p style="color:var(--neg);font-size:13px">Não parece um extrato Revolut (faltam colunas Montante/Descrição).</p>'; return; }
+  // multiconjunto do que já existe, para apanhar repetições legítimas no mesmo dia
+  const cnt={}; S.movs.forEach(m=>{const k=m.data+'|'+m.casa+'|'+m.tipo+'|'+(+m.valor).toFixed(2);cnt[k]=(cnt[k]||0)+1;});
   _imp=[];
   for(let r=1;r<rows.length;r++){
     const c=rows[r]; if(c.length<=iAmount) continue;
-    const state=(iState>=0?(c[iState]||''):'').trim().toUpperCase();
-    if(state && state!=='COMPLETED') continue;
+    const st=(iState>=0?(c[iState]||''):'').trim().toUpperCase();
+    if(st && !(st.startsWith('CONCLU')||st==='COMPLETED')) continue;   // só concluídas
     const hit=REV_CASAS.find(x=>(c[iDesc]||'').toLowerCase().includes(x.kw));
     if(!hit) continue;
     const amt=parseFloat((c[iAmount]||'').replace(/\s/g,'').replace(',','.'));
     if(!isFinite(amt)||amt===0) continue;
-    const data=(((iComp>=0&&c[iComp])?c[iComp]:(c[iStart]||''))).trim().slice(0,10);
+    const data=(((iStart>=0&&c[iStart])?c[iStart]:(iComp>=0?c[iComp]:''))).trim().slice(0,10);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(data)) continue;
-    const tipo=amt<0?'deposito':'levantamento';
+    const tipo=amt<0?'deposito':'levantamento';        // saída p/ casa = depósito; entrada = levantamento
     const valor=Math.round(Math.abs(amt)*100)/100;
-    const dup=have.has(data+'|'+hit.casa+'|'+tipo+'|'+valor.toFixed(2));
+    const key=data+'|'+hit.casa+'|'+tipo+'|'+valor.toFixed(2);
+    let dup=false; if(cnt[key]>0){dup=true;cnt[key]--;}
     _imp.push({data,casa:hit.casa,tipo,valor,dup,on:!dup});
   }
   _imp.sort((a,b)=>a.data<b.data?1:-1);
