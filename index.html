@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0c1611">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Banca</title>
+<title>Controlo de Apostas</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,8 +54,9 @@ header{position:sticky;top:0;z-index:40;
 .hbar{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .brand{display:flex;align-items:center;gap:9px}
 .chip-suit{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
-  background:linear-gradient(150deg,#1d2f24,#101b14);border:1px solid var(--line);color:var(--brass);font-size:15px}
-.brand h1{font-family:'Space Grotesk';font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em}
+  background:linear-gradient(150deg,#16c172,#0d9488);border:1px solid rgba(255,255,255,.16);color:#F7D85B;font-size:15px;
+  box-shadow:0 2px 10px rgba(13,148,136,.35)}
+.brand h1{font-family:'Space Grotesk';font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em;white-space:nowrap}
 .brand small{display:block;color:var(--faint);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;margin-top:-2px}
 .acct{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--surf);
   display:grid;place-items:center;font-size:13px;color:var(--muted);overflow:hidden}
@@ -238,15 +239,30 @@ function epocaDe(dateStr){
 }
 function epocasDisponiveis(){
   const set=new Set(S.movs.map(m=>epocaDe(m.data)));
-  return [...set].sort();
+  return [...set].sort().reverse();   // mais recente primeiro
 }
 
 /* ---------- supabase ---------- */
-let _tok=null,_exp=0;
+let _tok=null,_rtok=null,_exp=0;
+const SKEY='bc_session';
+function saveSession(){ try{ if(_tok) localStorage.setItem(SKEY,JSON.stringify({t:_tok,r:_rtok,e:_exp})); }catch(e){} }
+function loadSession(){ try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&s.t){_tok=s.t;_rtok=s.r||null;_exp=s.e||0;return true;} }catch(e){} return false; }
+function clearSession(){ try{ localStorage.removeItem(SKEY); }catch(e){} _tok=null;_rtok=null;_exp=0; }
+async function refreshSession(){
+  if(!_rtok) return false;
+  try{
+    const r=await fetch(CFG.SB_URL+'/auth/v1/token?grant_type=refresh_token',
+      {method:'POST',headers:{apikey:CFG.SB_ANON,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:_rtok})});
+    if(!r.ok) throw new Error('refresh '+r.status);
+    const d=await r.json();
+    _tok=d.access_token; _rtok=d.refresh_token||_rtok; _exp=Date.now()+((d.expires_in||3600)*1000);
+    saveSession(); return true;
+  }catch(e){ clearSession(); return false; }
+}
 async function sbAuthHeader(){
   if(S.demo) return {};
   if(_tok && Date.now()<_exp-60000) return {Authorization:'Bearer '+_tok};
-  // tenta refrescar a partir da sessão guardada na URL/hash (fluxo simples)
+  if(_rtok && await refreshSession()) return {Authorization:'Bearer '+_tok};
   return _tok?{Authorization:'Bearer '+_tok}:{};
 }
 async function sb(path, {method='GET',body=null,write=false}={}){
@@ -285,14 +301,11 @@ function totais(list){
   list.forEach(m=>{ if(m.tipo==='deposito')dep+=+m.valor; else lev+=+m.valor; });
   return {dep,lev};
 }
-function saldoTotal(){ return S.casas.reduce((a,c)=>a+(+c.saldo||0),0); }
 function casaStats(nome,season){
   let list=S.movs.filter(m=>m.casa===nome);
   if(season!=='all') list=list.filter(m=>epocaDe(m.data)===season);
   const {dep,lev}=totais(list);
-  const casa=S.casas.find(c=>c.nome===nome);
-  const saldo=+(casa?.saldo||0);
-  return {dep,lev,saldo,resultado:lev+saldo-dep,nMov:list.length};
+  return {dep,lev,resultado:lev-dep,nMov:list.length};
 }
 
 /* ============================================================
@@ -302,14 +315,12 @@ function render(){
   if(!S.demo && !S.user){ renderLogin(); return; }
   const list=movsFiltrados();
   const {dep,lev}=totais(list);
-  const saldo=saldoTotal();
   const isAll=S.season==='all';
-  // resultado: com época específica mostramos fluxo (lev-dep); em "todas" incluímos saldo atual
-  const resultado = isAll ? (lev+saldo-dep) : (lev-dep);
-  const resLabel = isAll ? 'Resultado' : 'Fluxo da época';
+  const resultado = lev-dep;
+  const resLabel = 'Resultado';
   const resCls = resultado>0.005?'pos':(resultado<-0.005?'neg':'');
-  const denom=Math.max(dep,lev+ (isAll?saldo:0),1);
-  const outW=Math.min(100,dep/denom*100), inW=Math.min(100,(lev+(isAll?saldo:0))/denom*100);
+  const denom=Math.max(dep,lev,1);
+  const outW=Math.min(100,dep/denom*100), inW=Math.min(100,lev/denom*100);
 
   const seasons=epocasDisponiveis();
   const tabs=['all',...seasons].map(s=>`<button class="stab ${S.season===s?'on':''}" onclick="setSeason('${s}')">${s==='all'?'Todas':s}</button>`).join('');
@@ -325,8 +336,6 @@ function render(){
       <div class="rl">Resultado</div>
       <div class="res ${rc}">${sign}${eur0(Math.abs(st.resultado))}</div>
       <div class="cfoot"><span class="o">${eur0(st.dep)}</span><span class="i">${eur0(st.lev)}</span></div>
-      <button class="salchip" onclick="event.stopPropagation();editSaldo('${esc(c.nome)}')">
-        Saldo<b class="${(+c.saldo)?'':'empty'}">${(+c.saldo)?eur0(c.saldo):'definir'}</b></button>
     </div>`;
   }).join('');
 
@@ -369,7 +378,7 @@ function render(){
     <div class="hbar">
       <div class="brand">
         <div class="chip-suit">${BALL}</div>
-        <div><h1>Banca${S.demo?'<span class="demoBadge">demo</span>':''}</h1><small>Caderneta de apostas</small></div>
+        <div><h1>Controlo de Apostas${S.demo?'<span class="demoBadge">demo</span>':''}</h1><small>Depósitos &amp; levantamentos</small></div>
       </div>
       <button class="acct" onclick="acctMenu()">${avatar}</button>
     </div>
@@ -380,12 +389,11 @@ function render(){
       <div class="lbl"><span>${resLabel}${S.season==='all'?'':' · '+S.season}</span>
         <span class="mono" style="color:var(--brass)">${list.length} mov.</span></div>
       <div class="big ${resCls}">${resultado>=0?'+':'−'}${eur(Math.abs(resultado)).replace('-','')}</div>
-      <div class="sub">${isAll?'Levantamentos + saldo atual − depósitos':'Levantamentos − depósitos nesta época'}</div>
+      <div class="sub">Levantamentos − depósitos${isAll?'':' nesta época'}</div>
       <div class="flow"><i class="out" style="width:${outW}%"></i><i class="in" style="width:${inW}%"></i></div>
       <div class="legend">
         <div><span class="dot o"></span>Depositado <b>${eur0(dep)}</b></div>
         <div><span class="dot i"></span>Levantado <b>${eur0(lev)}</b></div>
-        ${isAll?`<div><span class="dot s"></span>Saldo atual <b>${eur0(saldo)}</b></div>`:''}
       </div>
     </div>
 
@@ -403,8 +411,8 @@ function render(){
 function renderLogin(){
   $('#app').innerHTML=`<div class="login"><div class="card">
     <div class="chip-suit">${BALL}</div>
-    <h1>Banca</h1>
-    <p>A tua caderneta de depósitos e levantamentos nas casas de apostas. Privada, só tua.</p>
+    <h1>Controlo de Apostas</h1>
+    <p>Os teus depósitos e levantamentos nas casas de apostas. Privado, só teu.</p>
     <button class="gbtn" onclick="googleLogin()">
       <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>
       Entrar com Google
@@ -415,7 +423,14 @@ function renderLogin(){
 
 /* ---------- ações UI ---------- */
 function esc(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]))}
-function setSeason(s){S.season=s;render()}
+function setSeason(s){S.season=s;try{localStorage.setItem('bc_season',s)}catch(e){}render()}
+function applySeasonDefault(){
+  // mantém o separador escolhido entre sessões; por defeito a época mais recente
+  const eps=epocasDisponiveis();
+  let saved=null; try{saved=localStorage.getItem('bc_season')}catch(e){}
+  if(saved && (saved==='all'||eps.includes(saved))) S.season=saved;
+  else S.season=eps[0]||'all';
+}
 function toggleCasa(n){S.filterCasa=(S.filterCasa===n)?null:n;render()}
 let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2000)}
@@ -485,26 +500,6 @@ async function delMov(){
   }catch(e){toast('Erro: '+e.message)}
 }
 
-/* ----- saldo por casa ----- */
-function editSaldo(nome){
-  const c=S.casas.find(x=>x.nome===nome);
-  openSheet(`<h2>Saldo atual · ${esc(nome)}</h2>
-    <p style="color:var(--muted);font-size:13px;margin:-6px 0 16px">Quanto tens neste momento nesta casa. Entra no cálculo do resultado real.</p>
-    <div class="field"><label>Saldo (€)</label><input id="f_saldo" type="number" inputmode="decimal" step="0.01" min="0" value="${+c.saldo||''}" placeholder="0,00"></div>
-    <button class="btnP" onclick="saveSaldo('${esc(nome)}')">Guardar saldo</button>
-    <button class="btnGhost" onclick="closeSheet()">Cancelar</button>`);
-  setTimeout(()=>$('#f_saldo')?.focus(),250);
-}
-async function saveSaldo(nome){
-  const v=parseFloat(($('#f_saldo').value||'0').replace(',','.'))||0;
-  const body={saldo:Math.round(v*100)/100,saldo_em:new Date().toISOString()};
-  try{
-    if(S.demo){Object.assign(S.casas.find(c=>c.nome===nome),body)}
-    else await sb('casas?nome=eq.'+encodeURIComponent(nome),{method:'PATCH',body,write:true});
-    toast('Saldo atualizado'); closeSheet(); if(!S.demo)await load(); render();
-  }catch(e){toast('Erro: '+e.message)}
-}
-
 /* ----- gerir casas ----- */
 function gerirCasas(){
   const rows=S.casas.map(c=>`<div class="mov">
@@ -537,8 +532,117 @@ function acctMenu(){
   openSheet(`<h2>Conta</h2>
     <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 14px">
       ${S.demo?'Modo demo — dados embebidos, alterações não são guardadas. Mete a anon key no CFG para ligar ao Supabase.':esc(S.user?.email||'')}</p>
+    <button class="btnGhost" onclick="importRevolut()">Importar extrato Revolut</button>
     ${S.demo?'':`<button class="btnGhost" onclick="logout()">Terminar sessão</button>`}
     <button class="btnGhost" onclick="closeSheet()">Fechar</button>`);
+}
+
+/* ---------- importar extrato Revolut ---------- */
+const REV_CASAS=[
+  {kw:'betclic', casa:'betClic'},
+  {kw:'betano',  casa:'Betano'},
+  {kw:'placard', casa:'placard.pt'}
+];
+let _imp=[];   // {data,casa,tipo,valor,dup,on}
+
+function importRevolut(){
+  openSheet(`<h2>Importar do Revolut</h2>
+    <p style="color:var(--muted);font-size:13px;margin:-6px 0 14px">
+      Na app Revolut exporta o extrato em <b>CSV</b> e escolhe aqui o ficheiro.
+      Apanho só Betclic, Betano e Placard e ignoro o que já está registado.</p>
+    <div class="field"><label>Ficheiro CSV</label>
+      <input id="f_rev" type="file" accept=".csv,text/csv" onchange="revFile(this)"></div>
+    <div id="revOut"></div>
+    <button class="btnGhost" onclick="closeSheet()">Fechar</button>`);
+}
+function revFile(input){
+  const file=input.files&&input.files[0]; if(!file)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ revParse(rd.result); }
+    catch(e){ $('#revOut').innerHTML='<p style="color:var(--neg);font-size:13px">Não consegui ler: '+esc(e.message)+'</p>'; } };
+  rd.readAsText(file);
+}
+function csvRows(txt){
+  const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<txt.length;i++){ const ch=txt[i];
+    if(q){ if(ch==='"'){ if(txt[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else{
+      if(ch==='"')q=true;
+      else if(ch===',')   {row.push(cur);cur='';}
+      else if(ch==='\n')  {row.push(cur);rows.push(row);row=[];cur='';}
+      else if(ch==='\r')  {}
+      else cur+=ch;
+    }
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function revParse(txt){
+  const rows=csvRows(txt).filter(r=>r.length>1);
+  const out=$('#revOut');
+  if(!rows.length){ out.innerHTML='<p style="color:var(--neg);font-size:13px">CSV vazio.</p>'; return; }
+  const head=rows[0].map(h=>h.trim().toLowerCase());
+  const col=cands=>head.findIndex(h=>cands.some(c=>h.includes(c)));
+  const iAmount=col(['montante','amount']);            // PT / EN
+  const iDesc  =col(['descri','description']);
+  const iStart =col(['início','inicio','started','start date']);
+  const iComp  =col(['conclus','completed']);
+  const iState =col(['estado','state']);
+  if(iAmount<0||iDesc<0){ out.innerHTML='<p style="color:var(--neg);font-size:13px">Não parece um extrato Revolut (faltam colunas Montante/Descrição).</p>'; return; }
+  // multiconjunto do que já existe, para apanhar repetições legítimas no mesmo dia
+  const cnt={}; S.movs.forEach(m=>{const k=m.data+'|'+m.casa+'|'+m.tipo+'|'+(+m.valor).toFixed(2);cnt[k]=(cnt[k]||0)+1;});
+  _imp=[];
+  for(let r=1;r<rows.length;r++){
+    const c=rows[r]; if(c.length<=iAmount) continue;
+    const st=(iState>=0?(c[iState]||''):'').trim().toUpperCase();
+    if(st && !(st.startsWith('CONCLU')||st==='COMPLETED')) continue;   // só concluídas
+    const hit=REV_CASAS.find(x=>(c[iDesc]||'').toLowerCase().includes(x.kw));
+    if(!hit) continue;
+    const amt=parseFloat((c[iAmount]||'').replace(/\s/g,'').replace(',','.'));
+    if(!isFinite(amt)||amt===0) continue;
+    const data=(((iStart>=0&&c[iStart])?c[iStart]:(iComp>=0?c[iComp]:''))).trim().slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(data)) continue;
+    const tipo=amt<0?'deposito':'levantamento';        // saída p/ casa = depósito; entrada = levantamento
+    const valor=Math.round(Math.abs(amt)*100)/100;
+    const key=data+'|'+hit.casa+'|'+tipo+'|'+valor.toFixed(2);
+    let dup=false; if(cnt[key]>0){dup=true;cnt[key]--;}
+    _imp.push({data,casa:hit.casa,tipo,valor,dup,on:!dup});
+  }
+  _imp.sort((a,b)=>a.data<b.data?1:-1);
+  revRender();
+}
+function revRender(){
+  const out=$('#revOut');
+  if(!_imp.length){ out.innerHTML='<p style="color:var(--muted);font-size:13px;margin:10px 0">Nenhum movimento de Betclic/Betano/Placard encontrado.</p>'; return; }
+  const dups=_imp.filter(x=>x.dup).length, novos=_imp.length-dups;
+  const sel=_imp.filter(x=>x.on).length;
+  const rows=_imp.map((x,i)=>`<div class="mov" style="${x.dup?'opacity:.5':''}" onclick="revToggle(${i})">
+      <div class="ic ${x.tipo==='deposito'?'dep':'lev'}">${x.tipo==='deposito'?'↑':'↓'}</div>
+      <div class="mid"><div class="l1"><span class="cn">${esc(x.casa)}</span></div>
+        <div class="l2">${x.data} · ${x.tipo==='deposito'?'Depósito':'Levantamento'}${x.dup?' · já existe':''}</div></div>
+      <div class="amt ${x.tipo==='deposito'?'dep':'lev'}">${x.tipo==='deposito'?'−':'+'}${eur0(x.valor)}</div>
+      <div style="margin-left:8px;font-size:17px;color:${x.on?'var(--brass)':'var(--faint)'}">${x.on?'☑':'☐'}</div>
+    </div>`).join('');
+  out.innerHTML=`<p style="color:var(--muted);font-size:12.5px;margin:12px 2px 8px">${novos} novo(s) · ${dups} já existente(s). Toca para incluir/excluir.</p>
+    <div style="max-height:44vh;overflow:auto;margin-bottom:12px">${rows}</div>
+    <button class="btnP" onclick="revImport()" ${sel?'':'disabled style="opacity:.5"'}>Importar ${sel} movimento(s)</button>`;
+}
+function revToggle(i){ _imp[i].on=!_imp[i].on; revRender(); }
+async function revImport(){
+  const pick=_imp.filter(x=>x.on);
+  if(!pick.length) return toast('Nada selecionado');
+  let ok=0,fail=0,nid=nextId();
+  for(const x of pick){
+    const rec={data:x.data,casa:x.casa,tipo:x.tipo,valor:x.valor,nota:'Revolut'};
+    try{
+      const id=nid++;
+      if(S.demo){ S.movs.push({id,...rec}); }
+      else await sb('movimentos',{method:'POST',body:{id,...rec},write:true});
+      ok++;
+    }catch(e){ fail++; }
+  }
+  toast(`Importados ${ok}${fail?' · '+fail+' falharam':''}`);
+  closeSheet(); if(!S.demo) await load(); render();
 }
 
 /* ---------- auth (Google via Supabase) ---------- */
@@ -546,21 +650,26 @@ function googleLogin(){
   const redirect=location.origin+location.pathname;
   location.href=`${CFG.SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirect)}`;
 }
-function logout(){_tok=null;_exp=0;S.user=null;location.hash='';closeSheet();render()}
+function logout(){clearSession();S.user=null;location.hash='';closeSheet();render()}
 function parseAuthHash(){
   if(!location.hash.includes('access_token'))return false;
   const p=new URLSearchParams(location.hash.slice(1));
-  _tok=p.get('access_token'); _exp=Date.now()+(+p.get('expires_in')||3600)*1000;
+  _tok=p.get('access_token'); _rtok=p.get('refresh_token');
+  _exp=Date.now()+((+p.get('expires_in')||3600)*1000);
+  saveSession();
   history.replaceState(null,'',location.pathname);
   return true;
 }
 async function fetchUser(){
   try{
-    const r=await fetch(CFG.SB_URL+'/auth/v1/user',{headers:{apikey:CFG.SB_ANON,Authorization:'Bearer '+_tok}});
+    let r=await fetch(CFG.SB_URL+'/auth/v1/user',{headers:{apikey:CFG.SB_ANON,Authorization:'Bearer '+_tok}});
+    if(r.status===401 && await refreshSession())
+      r=await fetch(CFG.SB_URL+'/auth/v1/user',{headers:{apikey:CFG.SB_ANON,Authorization:'Bearer '+_tok}});
+    if(!r.ok) throw new Error('user '+r.status);
     const u=await r.json();
     if(u.email!==CFG.ADMIN_EMAIL){alert('Sem acesso a esta conta.');logout();return;}
     S.user={email:u.email,avatar:u.user_metadata?.avatar_url};
-  }catch(e){_tok=null}
+  }catch(e){ clearSession(); }
 }
 
 /* ---------- pull to refresh ---------- */
@@ -580,12 +689,23 @@ addEventListener('touchend',async()=>{
 /* ---------- arranque ---------- */
 (async function init(){
   if(!S.demo){
-    if(parseAuthHash()) await fetchUser();
-    else { renderLogin(); /* sem token guardado, pede login */ }
+    if(parseAuthHash()){ await fetchUser(); }
+    else if(loadSession()){
+      if(Date.now()>=_exp-60000) await refreshSession();
+      if(_tok) await fetchUser();
+    }
+    if(!S.user) renderLogin();
   }
-  try{ if(S.demo||S.user) await load(); }catch(e){ console.error(e); }
+  try{ if(S.demo||S.user){ await load(); applySeasonDefault(); } }catch(e){ console.error(e); }
   render();
 })();
+
+/* ao voltar à app (switch de app), refresca os dados mantendo o separador */
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState!=='visible' || !(S.demo||S.user)) return;
+  try{ await load(); }catch(e){}
+  render();
+});
 
 /* ---------- service worker ---------- */
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}

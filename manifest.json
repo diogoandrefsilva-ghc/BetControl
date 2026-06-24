@@ -1,7 +1,7 @@
 {
-  "name": "Banca — Apostas",
-  "short_name": "Banca",
-  "description": "Caderneta de depósitos e levantamentos nas casas de apostas",
+  "name": "Controlo de Apostas",
+  "short_name": "Apostas",
+  "description": "Depósitos e levantamentos nas casas de apostas",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
