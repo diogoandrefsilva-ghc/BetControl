@@ -1,5 +1,5 @@
-/* Banca — service worker */
-const CACHE = 'banca-v1';
+/* Controlo de Apostas — service worker */
+const CACHE = 'bc-v2';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
