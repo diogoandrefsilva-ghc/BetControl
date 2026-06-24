@@ -543,7 +543,7 @@ const REV_CASAS=[
   {kw:'betano',  casa:'Betano'},
   {kw:'placard', casa:'placard.pt'}
 ];
-let _imp=[];   // {data,casa,tipo,valor,dup,on}
+let _grp=[];   // por dia/casa/tipo: {data,casa,tipo,ext:[],extTot,bd:[],bdTot,status,replace}
 
 function importRevolut(){
   openSheet(`<h2>Importar do Revolut</h2>
@@ -589,9 +589,8 @@ function revParse(txt){
   const iComp  =col(['conclus','completed']);
   const iState =col(['estado','state']);
   if(iAmount<0||iDesc<0){ out.innerHTML='<p style="color:var(--neg);font-size:13px">Não parece um extrato Revolut (faltam colunas Montante/Descrição).</p>'; return; }
-  // multiconjunto do que já existe, para apanhar repetições legítimas no mesmo dia
-  const cnt={}; S.movs.forEach(m=>{const k=m.data+'|'+m.casa+'|'+m.tipo+'|'+(+m.valor).toFixed(2);cnt[k]=(cnt[k]||0)+1;});
-  _imp=[];
+  // agrupa o extrato por dia/casa/tipo
+  const G={};
   for(let r=1;r<rows.length;r++){
     const c=rows[r]; if(c.length<=iAmount) continue;
     const st=(iState>=0?(c[iState]||''):'').trim().toUpperCase();
@@ -604,44 +603,82 @@ function revParse(txt){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(data)) continue;
     const tipo=amt<0?'deposito':'levantamento';        // saída p/ casa = depósito; entrada = levantamento
     const valor=Math.round(Math.abs(amt)*100)/100;
-    const key=data+'|'+hit.casa+'|'+tipo+'|'+valor.toFixed(2);
-    let dup=false; if(cnt[key]>0){dup=true;cnt[key]--;}
-    _imp.push({data,casa:hit.casa,tipo,valor,dup,on:!dup});
+    const k=data+'|'+hit.casa+'|'+tipo;
+    (G[k]??={data,casa:hit.casa,tipo,ext:[]}).ext.push(valor);
   }
-  _imp.sort((a,b)=>a.data<b.data?1:-1);
+  // reconcilia cada grupo do extrato com o que está na BD (mesmo dia/casa/tipo)
+  const sum=a=>Math.round(a.reduce((s,v)=>s+v,0)*100)/100;
+  const sameSet=(a,b)=>{ if(a.length!==b.length)return false;
+    const s=x=>[...x].map(v=>(+v).toFixed(2)).sort(); const A=s(a),B=s(b);
+    return A.every((v,i)=>v===B[i]); };
+  _grp=Object.values(G).map(g=>{
+    g.extTot=sum(g.ext);
+    g.bd=S.movs.filter(m=>m.data===g.data&&m.casa===g.casa&&m.tipo===g.tipo).map(m=>({id:m.id,valor:+m.valor}));
+    g.bdTot=sum(g.bd.map(m=>m.valor));
+    if(!g.bd.length) g.status='new';                                  // nada na BD → importar
+    else if(sameSet(g.ext,g.bd.map(m=>m.valor))) g.status='same';     // já igual → ignorar
+    else if(Math.abs(g.extTot-g.bdTot)<0.005) g.status='auto';        // total igual → substituir (silencioso)
+    else g.status='conflict';                                         // total difere → perguntar
+    g.replace=false;                                                  // conflitos: por defeito manter BD
+    return g;
+  }).sort((a,b)=>a.data<b.data?1:-1);
   revRender();
 }
 function revRender(){
   const out=$('#revOut');
-  if(!_imp.length){ out.innerHTML='<p style="color:var(--muted);font-size:13px;margin:10px 0">Nenhum movimento de Betclic/Betano/Placard encontrado.</p>'; return; }
-  const dups=_imp.filter(x=>x.dup).length, novos=_imp.length-dups;
-  const sel=_imp.filter(x=>x.on).length;
-  const rows=_imp.map((x,i)=>`<div class="mov" style="${x.dup?'opacity:.5':''}" onclick="revToggle(${i})">
-      <div class="ic ${x.tipo==='deposito'?'dep':'lev'}">${x.tipo==='deposito'?'↑':'↓'}</div>
-      <div class="mid"><div class="l1"><span class="cn">${esc(x.casa)}</span></div>
-        <div class="l2">${x.data} · ${x.tipo==='deposito'?'Depósito':'Levantamento'}${x.dup?' · já existe':''}</div></div>
-      <div class="amt ${x.tipo==='deposito'?'dep':'lev'}">${x.tipo==='deposito'?'−':'+'}${eur0(x.valor)}</div>
-      <div style="margin-left:8px;font-size:17px;color:${x.on?'var(--brass)':'var(--faint)'}">${x.on?'☑':'☐'}</div>
-    </div>`).join('');
-  out.innerHTML=`<p style="color:var(--muted);font-size:12.5px;margin:12px 2px 8px">${novos} novo(s) · ${dups} já existente(s). Toca para incluir/excluir.</p>
-    <div style="max-height:44vh;overflow:auto;margin-bottom:12px">${rows}</div>
-    <button class="btnP" onclick="revImport()" ${sel?'':'disabled style="opacity:.5"'}>Importar ${sel} movimento(s)</button>`;
-}
-function revToggle(i){ _imp[i].on=!_imp[i].on; revRender(); }
-async function revImport(){
-  const pick=_imp.filter(x=>x.on);
-  if(!pick.length) return toast('Nada selecionado');
-  let ok=0,fail=0,nid=nextId();
-  for(const x of pick){
-    const rec={data:x.data,casa:x.casa,tipo:x.tipo,valor:x.valor,nota:'Revolut'};
-    try{
-      const id=nid++;
-      if(S.demo){ S.movs.push({id,...rec}); }
-      else await sb('movimentos',{method:'POST',body:{id,...rec},write:true});
-      ok++;
-    }catch(e){ fail++; }
+  if(!_grp.length){ out.innerHTML='<p style="color:var(--muted);font-size:13px;margin:10px 0">Nenhum movimento de Betclic/Betano/Placard encontrado.</p>'; return; }
+  const nNew=_grp.filter(g=>g.status==='new').length;
+  const nAuto=_grp.filter(g=>g.status==='auto').length;
+  const nSame=_grp.filter(g=>g.status==='same').length;
+  const conflicts=_grp.filter(g=>g.status==='conflict');
+  const adds=_grp.filter(g=>g.status==='new'||g.status==='auto');
+  const dayL=d=>{const [,mo,dd]=d.split('-');return (+dd)+' '+MESES[+mo-1];};
+  let body='';
+  if(conflicts.length){
+    body+=`<div class="eyebrow" style="margin:4px 2px 8px;color:var(--neg)">Diferenças — decide o que fazer</div>`;
+    body+=conflicts.map(g=>{ const i=_grp.indexOf(g);
+      return `<div class="mov" onclick="revFlip(${i})">
+        <div class="ic ${g.tipo==='deposito'?'dep':'lev'}">${g.tipo==='deposito'?'↑':'↓'}</div>
+        <div class="mid"><div class="l1"><span class="cn">${esc(g.casa)}</span> · <span class="l2">${dayL(g.data)}</span></div>
+          <div class="l2">BD ${eur0(g.bdTot)} (${g.bd.length}) → extrato ${eur0(g.extTot)} (${g.ext.length})</div></div>
+        <div style="margin-left:8px;font-size:11.5px;font-weight:700;font-family:'Space Grotesk';color:${g.replace?'var(--neg)':'var(--faint)'}">${g.replace?'SUBSTITUIR':'MANTER'}</div>
+      </div>`; }).join('');
   }
-  toast(`Importados ${ok}${fail?' · '+fail+' falharam':''}`);
+  if(adds.length){
+    body+=`<div class="eyebrow" style="margin:14px 2px 8px;color:var(--muted)">A importar automaticamente</div>`;
+    body+=adds.map(g=>`<div class="mov" style="opacity:.9">
+        <div class="ic ${g.tipo==='deposito'?'dep':'lev'}">${g.tipo==='deposito'?'↑':'↓'}</div>
+        <div class="mid"><div class="l1"><span class="cn">${esc(g.casa)}</span> · <span class="l2">${dayL(g.data)}</span></div>
+          <div class="l2">${g.status==='new'?'novo':'atualizar'} · ${g.ext.length} mov</div></div>
+        <div class="amt ${g.tipo==='deposito'?'dep':'lev'}">${g.tipo==='deposito'?'−':'+'}${eur0(g.extTot)}</div>
+      </div>`).join('');
+  }
+  const willRep=conflicts.filter(g=>g.replace).length;
+  const nApply=adds.length+willRep;
+  out.innerHTML=`<p style="color:var(--muted);font-size:12.5px;margin:12px 2px 10px">
+      ${nNew} novo(s) · ${nAuto} atualizado(s) · ${conflicts.length} a decidir · ${nSame} já igual(is)</p>
+    <div style="max-height:46vh;overflow:auto;margin-bottom:12px">${body}</div>
+    <button class="btnP" onclick="revApply()" ${nApply?'':'disabled style="opacity:.5"'}>Aplicar (${nApply})</button>`;
+}
+function revFlip(i){ if(_grp[i].status==='conflict'){_grp[i].replace=!_grp[i].replace; revRender();} }
+async function revApply(){
+  const todo=_grp.filter(g=>g.status==='new'||g.status==='auto'||(g.status==='conflict'&&g.replace));
+  if(!todo.length) return toast('Nada a aplicar');
+  let ins=0,del=0,fail=0,nid=nextId();
+  for(const g of todo){
+    if(g.status!=='new'){                                  // apaga o que está na BD nesse dia/casa/tipo
+      for(const m of g.bd){
+        try{ if(S.demo){S.movs=S.movs.filter(x=>x.id!==m.id);} else await sb('movimentos?id=eq.'+m.id,{method:'DELETE',write:true}); del++; }
+        catch(e){ fail++; }
+      }
+    }
+    for(const v of g.ext){
+      const rec={data:g.data,casa:g.casa,tipo:g.tipo,valor:v,nota:'Revolut'};
+      try{ const id=nid++; if(S.demo){S.movs.push({id,...rec});} else await sb('movimentos',{method:'POST',body:{id,...rec},write:true}); ins++; }
+      catch(e){ fail++; }
+    }
+  }
+  toast(`+${ins} inseridos · ${del} apagados${fail?' · '+fail+' erros':''}`);
   closeSheet(); if(!S.demo) await load(); render();
 }
 
