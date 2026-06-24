@@ -220,6 +220,25 @@ header{position:sticky;top:0;z-index:40;
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .demoBadge{display:inline-block;margin-left:8px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--brass);border:1px solid var(--brass-dim);border-radius:6px;padding:2px 6px;vertical-align:middle;font-family:'Space Grotesk';font-weight:600}
+
+/* ===== gráfico evolução ===== */
+.chartCasas{display:flex;gap:8px;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;margin:2px 2px 13px;padding-bottom:2px}
+.chartCasas::-webkit-scrollbar{display:none}
+.chartCasas button{white-space:nowrap;padding:8px 13px;border-radius:999px;font-size:12.5px;font-weight:600;background:var(--surf);
+  border:1px solid var(--line);color:var(--muted);font-family:'Space Grotesk';display:flex;align-items:center;gap:7px;transition:.15s}
+.chartCasas button .cd{width:9px;height:9px;border-radius:3px;flex:none}
+.chartCasas button.on{border-color:var(--brass);background:rgba(176,135,20,.12);color:var(--ivory)}
+.chartCard{background:linear-gradient(165deg,#ffffff,var(--surf2));border:1px solid var(--line);border-radius:16px;
+  padding:16px 14px 13px;box-shadow:0 1px 2px rgba(40,50,45,.04),0 6px 16px rgba(40,50,45,.05)}
+.chartScroll{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;padding-bottom:2px}
+.chartScroll::-webkit-scrollbar{display:none}
+.bars{display:flex;align-items:flex-end;gap:14px;min-width:100%;padding:0 2px}
+.bcol{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:30px}
+.bpair{display:flex;align-items:flex-end;justify-content:center;gap:4px;height:162px;width:100%}
+.bar{width:11px;border-radius:5px 5px 0 0;min-height:2px}
+.bar.dep{background:linear-gradient(180deg,#e2675d,var(--neg))}
+.bar.lev{background:linear-gradient(180deg,var(--pos),#2e8c47)}
+.bcol .blab{font-size:10.5px;color:var(--faint);font-family:'Space Grotesk';font-weight:600;white-space:nowrap;text-transform:capitalize}
 </style>
 </head>
 <body>
@@ -401,6 +420,41 @@ function render(){
     }).join('');
   }
 
+  // gráfico de evolução (cronológico, mais antigo → mais recente)
+  const chartCasasH=`<div class="chartCasas">
+    <button class="${!S.filterCasa?'on':''}" onclick="toggleCasa(null)">Todas</button>
+    ${S.casas.filter(c=>c.ativa!==false).map(c=>`<button class="${S.filterCasa===c.nome?'on':''}" onclick="toggleCasa('${esc(c.nome)}')"><span class="cd" style="background:${c.cor}"></span>${esc(c.nome)}</button>`).join('')}
+  </div>`;
+  const chartMeses=mesesResumo(list).slice().reverse();
+  let chartH='';
+  if(chartMeses.length===0){
+    chartH=`<div class="empty">Sem movimentos ${S.filterCasa?'em '+esc(S.filterCasa):'nesta época'}.</div>`;
+  }else{
+    const H=160, maxV=Math.max(...chartMeses.flatMap(m=>[m.dep,m.lev]),1);
+    const cols=chartMeses.map((m,i)=>{
+      const prev=i>0?chartMeses[i-1]:null;
+      const showY=m.mo===1||i===0||(prev&&prev.y!==m.y);
+      const lab=MESES[m.mo-1]+(showY?` ’${String(m.y).slice(2)}`:'');
+      const dh=m.dep>0?Math.max(3,Math.round(m.dep/maxV*H)):0;
+      const lh=m.lev>0?Math.max(3,Math.round(m.lev/maxV*H)):0;
+      const tip=`${MESESL[m.mo-1]} ${m.y}`;
+      return `<div class="bcol">
+        <div class="bpair">
+          <div class="bar dep" style="height:${dh}px" title="${tip} · Depositado ${eur0(m.dep)}"></div>
+          <div class="bar lev" style="height:${lh}px" title="${tip} · Levantado ${eur0(m.lev)}"></div>
+        </div>
+        <div class="blab">${lab}</div>
+      </div>`;
+    }).join('');
+    chartH=`<div class="chartCard">
+      <div class="chartScroll"><div class="bars">${cols}</div></div>
+      <div class="legend" style="margin-top:14px;justify-content:center">
+        <div><span class="dot o"></span>Depositado <b>${eur0(dep)}</b></div>
+        <div><span class="dot i"></span>Levantado <b>${eur0(lev)}</b></div>
+      </div>
+    </div>`;
+  }
+
   // movimentos agrupados por mês
   let movH='';
   if(list.length===0){
@@ -473,9 +527,10 @@ function render(){
       <div class="subtabs">
         <button class="${S.totView==='mes'?'on':''}" onclick="setTotView('mes')">Por mês</button>
         <button class="${S.totView==='casa'?'on':''}" onclick="setTotView('casa')">Por casa</button>
+        <button class="${S.totView==='grafico'?'on':''}" onclick="setTotView('grafico')">Gráfico</button>
         ${rightLink}
       </div>
-      ${S.totView==='mes' ? mesesH : `<div class="casas">${casasH}</div>`}
+      ${S.totView==='mes' ? mesesH : S.totView==='casa' ? `<div class="casas">${casasH}</div>` : chartCasasH+chartH}
     ` : `
       <div class="sect"><span class="eyebrow">Movimentos${S.filterCasa?' · '+esc(S.filterCasa):''}</span>
         ${S.filterCasa?`<button class="link" onclick="toggleCasa(null)">Ver todas ✕</button>`:''}
@@ -506,7 +561,7 @@ function setView(v){S.view=v;try{localStorage.setItem('bc_view',v)}catch(e){}ren
 function setTotView(v){S.totView=v;try{localStorage.setItem('bc_totview',v)}catch(e){}render()}
 function applyViewDefaults(){
   try{const v=localStorage.getItem('bc_view'); if(v==='totais'||v==='movimentos')S.view=v;
-      const t=localStorage.getItem('bc_totview'); if(t==='mes'||t==='casa')S.totView=t;}catch(e){}
+      const t=localStorage.getItem('bc_totview'); if(t==='mes'||t==='casa'||t==='grafico')S.totView=t;}catch(e){}
 }
 function applySeasonDefault(){
   // mantém o separador escolhido entre sessões; por defeito a época mais recente
