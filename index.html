@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0c1611">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Banca</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c1611; --bg2:#0a120e;
+  --surf:#15231b; --surf2:#1b2c22; --line:#2a3c31;
+  --ivory:#ECE6D8; --muted:#8FA396; --faint:#64776c;
+  --brass:#C9A227; --brass-dim:#9c7e1f;
+  --pos:#46c266; --neg:#e5574c;
+  --r:18px;
+  --safe-t:env(safe-area-inset-top);
+  --safe-b:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:radial-gradient(120% 80% at 50% -10%,#13241b 0%,var(--bg) 45%,var(--bg2) 100%) fixed;
+  color:var(--ivory); font-family:Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; min-height:100vh;
+  caret-color:transparent; overscroll-behavior-y:contain;
+}
+button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer;caret-color:transparent}
+input,select{font-family:inherit}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:'Space Grotesk',sans-serif}
+.eyebrow{font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:600;color:var(--faint)}
+
+/* ===== pull to refresh ===== */
+#ptr{position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;align-items:flex-end;
+  height:0;overflow:hidden;z-index:60;pointer-events:none;transition:height .18s ease}
+#ptr .spin{width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--brass);
+  border-radius:50%;margin-bottom:10px;opacity:.0;transition:opacity .15s}
+#ptr.pull .spin{opacity:1}
+#ptr.go .spin{animation:sp .7s linear infinite;opacity:1}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ===== layout ===== */
+.wrap{max-width:560px;margin:0 auto;padding:0 16px calc(120px + var(--safe-b))}
+header{position:sticky;top:0;z-index:40;
+  padding:calc(var(--safe-t) + 12px) 16px 10px;
+  background:linear-gradient(var(--bg) 70%,transparent);
+  backdrop-filter:blur(6px)}
+.hbar{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{display:flex;align-items:center;gap:9px}
+.chip-suit{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(150deg,#1d2f24,#101b14);border:1px solid var(--line);color:var(--brass);font-size:15px}
+.brand h1{font-family:'Space Grotesk';font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em}
+.brand small{display:block;color:var(--faint);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;margin-top:-2px}
+.acct{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--surf);
+  display:grid;place-items:center;font-size:13px;color:var(--muted);overflow:hidden}
+.acct img{width:100%;height:100%;object-fit:cover}
+
+/* season tabs */
+.seasons{display:flex;gap:7px;overflow-x:auto;padding:10px 0 2px;-ms-overflow-style:none;scrollbar-width:none}
+.seasons::-webkit-scrollbar{display:none}
+.stab{white-space:nowrap;padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:600;
+  background:var(--surf);border:1px solid var(--line);color:var(--muted);transition:.15s;font-family:'Space Grotesk'}
+.stab.on{background:var(--brass);border-color:var(--brass);color:#1a1305}
+
+/* hero */
+.hero{margin:14px 0 8px;background:linear-gradient(160deg,var(--surf2),var(--surf));
+  border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:0;background:radial-gradient(80% 60% at 100% 0,rgba(201,162,39,.10),transparent 60%);pointer-events:none}
+.hero .lbl{display:flex;justify-content:space-between;align-items:baseline}
+.hero .lbl span{color:var(--muted);font-size:12.5px}
+.big{font-family:'Space Grotesk';font-weight:700;font-size:42px;line-height:1.05;margin:6px 0 2px;letter-spacing:-.02em}
+.big.pos{color:var(--pos)} .big.neg{color:var(--neg)}
+.sub{color:var(--faint);font-size:12px;margin-bottom:14px}
+.flow{height:9px;border-radius:6px;background:#0e1813;display:flex;overflow:hidden;border:1px solid var(--line)}
+.flow i{display:block;height:100%}
+.flow .out{background:linear-gradient(90deg,#7a4a44,var(--neg))}
+.flow .in{background:linear-gradient(90deg,var(--pos),#2e8c47)}
+.legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+.legend div{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+.legend b{font-family:'IBM Plex Mono';font-weight:600;color:var(--ivory);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot.o{background:var(--neg)} .dot.i{background:var(--pos)} .dot.s{background:var(--brass)}
+
+/* section title */
+.sect{display:flex;align-items:center;justify-content:space-between;margin:22px 2px 11px}
+.sect .eyebrow{color:var(--muted)}
+.sect button.link{color:var(--brass);font-size:12.5px;font-weight:600}
+
+/* casa cards */
+.casas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.casa{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:13px;min-width:0;transition:.15s}
+.casa:active{transform:scale(.985)}
+.casa .top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.casa .top .cdot{width:10px;height:10px;border-radius:3px;flex:none}
+.casa .top h3{font-size:13.5px;font-weight:600;margin:0;font-family:'Space Grotesk';overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.casa .rl{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1px}
+.casa .res{font-family:'Space Grotesk';font-weight:700;font-size:21px;letter-spacing:-.01em}
+.casa .res.pos{color:var(--pos)} .casa .res.neg{color:var(--neg)} .casa .res.z{color:var(--muted)}
+.casa .cfoot{display:flex;gap:12px;margin-top:9px;font-family:'IBM Plex Mono';font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.casa .cfoot .o::before{content:"↑ ";color:var(--neg)}
+.casa .cfoot .i::before{content:"↓ ";color:var(--pos)}
+.casa .salchip{display:block;width:100%;margin-top:11px;padding:8px 10px;border-radius:10px;
+  background:#0e1813;border:1px solid var(--line);text-align:center;
+  font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.casa .salchip b{font-family:'IBM Plex Mono';font-weight:600;color:var(--brass);margin-left:5px}
+.casa .salchip b.empty{color:var(--faint);font-weight:400;font-family:Inter}
+
+/* movimentos */
+.month{margin-top:18px}
+.month .mh{display:flex;justify-content:space-between;align-items:baseline;margin:0 2px 8px}
+.month .mh .mtitle{font-family:'Space Grotesk';font-weight:600;font-size:14px;text-transform:capitalize}
+.month .mh .mtot{font-family:'IBM Plex Mono';font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mov{display:flex;align-items:center;gap:11px;background:var(--surf);border:1px solid var(--line);
+  border-radius:13px;padding:11px 13px;margin-bottom:7px;transition:.12s}
+.mov:active{background:var(--surf2)}
+.mov .ic{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:#0e1813;border:1px solid var(--line)}
+.mov .ic.dep{color:var(--neg)} .mov .ic.lev{color:var(--pos)}
+.mov .mid{flex:1;min-width:0}
+.mov .mid .l1{display:flex;align-items:center;gap:7px}
+.mov .mid .cn{font-size:13.5px;font-weight:600}
+.mov .mid .cc{width:7px;height:7px;border-radius:2px;flex:none}
+.mov .mid .l2{font-size:11px;color:var(--faint);margin-top:1px}
+.mov .amt{font-family:'IBM Plex Mono';font-weight:600;font-size:15px;white-space:nowrap}
+.mov .amt.dep{color:var(--ivory)} .mov .amt.lev{color:var(--pos)}
+
+.empty{text-align:center;color:var(--faint);padding:40px 20px;font-size:13.5px}
+
+/* FAB */
+.fab{position:fixed;right:18px;bottom:calc(20px + var(--safe-b));z-index:45;
+  width:58px;height:58px;border-radius:19px;background:linear-gradient(150deg,var(--brass),var(--brass-dim));
+  color:#1a1305;display:grid;place-items:center;font-size:28px;font-weight:300;
+  box-shadow:0 10px 26px rgba(201,162,39,.34),0 2px 6px rgba(0,0,0,.4);transition:.15s}
+.fab:active{transform:scale(.92)}
+
+/* sheet / modal */
+.scrim{position:fixed;inset:0;background:rgba(4,8,6,.62);backdrop-filter:blur(3px);z-index:80;
+  opacity:0;pointer-events:none;transition:.2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:81;background:var(--surf);
+  border-top:1px solid var(--line);border-radius:24px 24px 0 0;padding:8px 18px calc(22px + var(--safe-b));
+  transform:translateY(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-width:560px;margin:0 auto}
+.sheet.on{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:8px auto 14px}
+.sheet h2{font-family:'Space Grotesk';font-size:18px;font-weight:700;margin:0 0 16px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:500;letter-spacing:.02em}
+.field input,.field select{width:100%;background:#0e1813;border:1px solid var(--line);border-radius:12px;
+  color:var(--ivory);font-size:15.5px;padding:13px 13px;caret-color:var(--brass);
+  -webkit-appearance:none;appearance:none;min-width:0;max-width:100%;box-sizing:border-box}
+.field input:focus,.field select:focus{outline:none;border-color:var(--brass)}
+.row2{display:flex;gap:10px}.row2 .field{flex:1;min-width:0}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;padding:12px;border-radius:12px;background:#0e1813;border:1px solid var(--line);
+  font-weight:600;font-size:13.5px;color:var(--muted);font-family:'Space Grotesk'}
+.seg button.on.dep{background:rgba(229,87,76,.16);border-color:var(--neg);color:#f2a097}
+.seg button.on.lev{background:rgba(70,194,102,.16);border-color:var(--pos);color:#8fe0a3}
+.casaPick{display:flex;flex-wrap:wrap;gap:8px}
+.casaPick button{padding:9px 13px;border-radius:999px;background:#0e1813;border:1px solid var(--line);
+  font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px}
+.casaPick button .cd{width:9px;height:9px;border-radius:3px}
+.casaPick button.on{border-color:var(--brass);background:rgba(201,162,39,.12);color:var(--ivory)}
+.btnP{width:100%;padding:15px;border-radius:14px;background:linear-gradient(150deg,var(--brass),var(--brass-dim));
+  color:#1a1305;font-weight:700;font-size:15px;font-family:'Space Grotesk';margin-top:6px}
+.btnP:active{filter:brightness(.95)}
+.btnGhost{width:100%;padding:13px;border-radius:13px;background:transparent;border:1px solid var(--line);
+  color:var(--muted);font-weight:500;font-size:13.5px;margin-top:9px}
+.btnDel{color:var(--neg);border-color:rgba(229,87,76,.4)}
+
+/* login */
+.login{min-height:100vh;display:grid;place-items:center;padding:30px}
+.login .card{text-align:center;max-width:340px}
+.login .chip-suit{width:62px;height:62px;border-radius:18px;font-size:30px;margin:0 auto 20px}
+.login h1{font-family:'Space Grotesk';font-size:28px;margin:0 0 8px}
+.login p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 26px}
+.gbtn{display:inline-flex;align-items:center;gap:11px;background:#fff;color:#1a1a1a;font-weight:600;
+  font-size:15px;padding:13px 22px;border-radius:14px}
+.note{margin-top:22px;font-size:12px;color:var(--faint);line-height:1.5}
+
+.toast{position:fixed;left:50%;bottom:calc(94px + var(--safe-b));transform:translateX(-50%) translateY(20px);
+  background:#1d2c23;border:1px solid var(--line);color:var(--ivory);padding:11px 18px;border-radius:12px;
+  font-size:13.5px;z-index:90;opacity:0;transition:.2s;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.4)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.demoBadge{display:inline-block;margin-left:8px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--brass);border:1px solid var(--brass-dim);border-radius:6px;padding:2px 6px;vertical-align:middle;font-family:'Space Grotesk';font-weight:600}
+</style>
+</head>
+<body>
+<div id="ptr"><div class="spin"></div></div>
+<div id="app"></div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CONFIG — mete aqui a tua anon key e fica live no Supabase.
+   Deixa SB_ANON vazio para correr em modo DEMO (dados embebidos).
+   ============================================================ */
+const CFG = {
+  SB_URL: 'https://gjweqwfbnkgnibhajldc.supabase.co',
+  SB_ANON: '',                         // <-- cola aqui a anon/publishable key
+  SCHEMA: 'apostas',
+  ADMIN_EMAIL: 'diogo.andre.f.silva@gmail.com',
+  SEASON_START: {m:7,d:20}             // época começa a 20/jul
+};
+
+const BALL = `<svg viewBox="0 0 100 100" width="64%" height="64%" style="display:block" fill="none">
+<circle cx="50" cy="50" r="39" stroke="currentColor" stroke-width="6"/>
+<polygon points="50,34 65.2,45.1 59.4,62.9 40.6,62.9 34.8,45.1" fill="currentColor"/>
+<g stroke="currentColor" stroke-width="5" stroke-linecap="round">
+<line x1="50" y1="34" x2="50" y2="13"/><line x1="65.2" y1="45.1" x2="83" y2="38"/>
+<line x1="59.4" y1="62.9" x2="71" y2="80"/><line x1="40.6" y1="62.9" x2="29" y2="80"/>
+<line x1="34.8" y1="45.1" x2="17" y2="38"/></g></svg>`;
+
+const SEED = {"casas": [{"nome": "betClic", "cor": "#E2574C", "ordem": 1, "saldo": 0}, {"nome": "Betano", "cor": "#F2A900", "ordem": 2, "saldo": 0}, {"nome": "placard.pt", "cor": "#2E9E5B", "ordem": 3, "saldo": 0}, {"nome": "Outras", "cor": "#8A93A6", "ordem": 4, "saldo": 0}], "movimentos": [{"id": 1, "data": "2024-06-13", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 2, "data": "2024-06-14", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2023/24"}, {"id": 3, "data": "2024-06-16", "casa": "placard.pt", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 4, "data": "2024-06-17", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 5, "data": "2024-06-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2023/24"}, {"id": 6, "data": "2024-06-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 7, "data": "2024-06-22", "casa": "Betano", "tipo": "deposito", "valor": 30.0, "epoca": "2023/24"}, {"id": 8, "data": "2024-06-25", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 9, "data": "2024-06-26", "casa": "placard.pt", "tipo": "deposito", "valor": 10.0, "epoca": "2023/24"}, {"id": 10, "data": "2024-06-29", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2023/24"}, {"id": 11, "data": "2024-07-01", "casa": "placard.pt", "tipo": "deposito", "valor": 30.0, "epoca": "2023/24"}, {"id": 12, "data": "2024-07-04", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2023/24"}, {"id": 13, "data": "2024-08-17", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 14, "data": "2024-08-26", "casa": "placard.pt", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 15, "data": "2024-09-08", "casa": "placard.pt", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 16, "data": "2024-09-19", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 17, "data": "2024-09-22", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 18, "data": "2024-09-25", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 19, "data": "2024-10-05", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 20, "data": "2024-10-06", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 21, "data": "2024-10-06", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 22, "data": "2024-10-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 23, "data": "2024-10-13", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 24, "data": "2024-10-14", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 25, "data": "2024-10-19", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 26, "data": "2024-10-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 27, "data": "2024-10-22", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 28, "data": "2024-10-23", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 29, "data": "2024-10-23", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 30, "data": "2024-10-24", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 31, "data": "2024-10-25", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 32, "data": "2024-10-26", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 33, "data": "2024-10-26", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 34, "data": "2024-10-27", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 35, "data": "2024-10-29", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 36, "data": "2024-11-01", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 37, "data": "2024-11-02", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 38, "data": "2024-11-03", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 39, "data": "2024-11-05", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 40, "data": "2024-11-05", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 41, "data": "2024-11-06", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 42, "data": "2024-11-06", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 43, "data": "2024-11-07", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 44, "data": "2024-11-09", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 45, "data": "2024-11-09", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 46, "data": "2024-11-10", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 47, "data": "2024-11-15", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 48, "data": "2024-11-16", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 49, "data": "2024-11-23", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 50, "data": "2024-11-24", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 51, "data": "2024-11-26", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 52, "data": "2024-11-27", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 53, "data": "2024-11-27", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 54, "data": "2024-11-28", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 55, "data": "2024-11-29", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 56, "data": "2024-11-29", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 57, "data": "2024-12-01", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 58, "data": "2024-12-03", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 59, "data": "2024-12-06", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 60, "data": "2024-12-07", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 61, "data": "2024-12-08", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 62, "data": "2024-12-09", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 63, "data": "2024-12-10", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 64, "data": "2024-12-11", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 65, "data": "2024-12-12", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 66, "data": "2024-12-14", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 67, "data": "2024-12-15", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 68, "data": "2024-12-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 69, "data": "2024-12-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 70, "data": "2024-12-21", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 71, "data": "2024-12-22", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 72, "data": "2024-12-25", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 73, "data": "2024-12-26", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 74, "data": "2024-12-26", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 75, "data": "2024-12-28", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 76, "data": "2025-01-03", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 77, "data": "2025-01-03", "casa": "placard.pt", "tipo": "levantamento", "valor": 65.0, "epoca": "2024/25"}, {"id": 78, "data": "2025-01-04", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 79, "data": "2025-01-04", "casa": "Betano", "tipo": "levantamento", "valor": 120.0, "epoca": "2024/25"}, {"id": 80, "data": "2025-01-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 81, "data": "2025-01-12", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 82, "data": "2025-01-12", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 83, "data": "2025-01-14", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 84, "data": "2025-01-16", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 85, "data": "2025-01-17", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 86, "data": "2025-01-18", "casa": "Betano", "tipo": "deposito", "valor": 25.0, "epoca": "2024/25"}, {"id": 87, "data": "2025-01-21", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 88, "data": "2025-01-22", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 89, "data": "2025-01-22", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 90, "data": "2025-01-23", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 91, "data": "2025-01-24", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 92, "data": "2025-01-25", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 93, "data": "2025-01-26", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 94, "data": "2025-01-26", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 95, "data": "2025-01-28", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 96, "data": "2025-01-29", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 97, "data": "2025-01-30", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 98, "data": "2025-02-02", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 99, "data": "2025-02-03", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 100, "data": "2025-02-04", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 101, "data": "2025-02-05", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 102, "data": "2025-02-07", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 103, "data": "2025-02-08", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 104, "data": "2025-02-08", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 105, "data": "2025-02-09", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 106, "data": "2025-02-09", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 107, "data": "2025-02-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 108, "data": "2025-02-12", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 109, "data": "2025-02-13", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 110, "data": "2025-02-14", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 111, "data": "2025-02-15", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 112, "data": "2025-02-15", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 113, "data": "2025-02-16", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 114, "data": "2025-02-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 115, "data": "2025-02-19", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 116, "data": "2025-02-20", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 117, "data": "2025-02-22", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 118, "data": "2025-02-23", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 119, "data": "2025-03-01", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 120, "data": "2025-03-02", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 121, "data": "2025-03-06", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 122, "data": "2025-04-16", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 123, "data": "2025-04-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 124, "data": "2025-04-25", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 125, "data": "2025-04-26", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 126, "data": "2025-04-27", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 127, "data": "2025-05-01", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 128, "data": "2025-05-02", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 129, "data": "2025-05-03", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 130, "data": "2025-05-03", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 131, "data": "2025-05-04", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 132, "data": "2025-05-07", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 133, "data": "2025-05-08", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 134, "data": "2025-05-11", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 135, "data": "2025-05-14", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 136, "data": "2025-05-16", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 137, "data": "2025-05-17", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 138, "data": "2025-05-18", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 139, "data": "2025-05-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 140, "data": "2025-05-18", "casa": "Outras", "tipo": "deposito", "valor": 15.0, "epoca": "2024/25"}, {"id": 141, "data": "2025-05-23", "casa": "Betano", "tipo": "deposito", "valor": 6.0, "epoca": "2024/25"}, {"id": 142, "data": "2025-05-25", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 143, "data": "2025-06-04", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 144, "data": "2025-06-19", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 145, "data": "2025-06-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 146, "data": "2025-06-25", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 147, "data": "2025-06-25", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2024/25"}, {"id": 148, "data": "2025-06-26", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2024/25"}, {"id": 149, "data": "2025-07-06", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2024/25"}, {"id": 150, "data": "2025-07-24", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 151, "data": "2025-08-06", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 152, "data": "2025-08-10", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 153, "data": "2025-08-14", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 154, "data": "2025-08-14", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 155, "data": "2025-08-15", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 156, "data": "2025-08-15", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 157, "data": "2025-08-16", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 158, "data": "2025-08-16", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 159, "data": "2025-08-17", "casa": "betClic", "tipo": "deposito", "valor": 4.62, "epoca": "2025/26"}, {"id": 160, "data": "2025-08-17", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 161, "data": "2025-08-20", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 162, "data": "2025-08-21", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 163, "data": "2025-08-23", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 164, "data": "2025-08-24", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 165, "data": "2025-08-27", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 166, "data": "2025-08-28", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 167, "data": "2025-08-30", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 168, "data": "2025-08-30", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 169, "data": "2025-09-29", "casa": "Betano", "tipo": "deposito", "valor": 30.0, "epoca": "2025/26"}, {"id": 170, "data": "2025-10-05", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 171, "data": "2025-10-05", "casa": "Betano", "tipo": "levantamento", "valor": 150.0, "epoca": "2025/26"}, {"id": 172, "data": "2025-10-12", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 173, "data": "2025-10-13", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 174, "data": "2025-10-18", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 175, "data": "2025-10-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 176, "data": "2025-10-19", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 177, "data": "2025-10-19", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 178, "data": "2025-10-22", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 179, "data": "2025-10-22", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 180, "data": "2025-10-23", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 181, "data": "2025-10-23", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 182, "data": "2025-10-26", "casa": "betClic", "tipo": "deposito", "valor": 25.0, "epoca": "2025/26"}, {"id": 183, "data": "2025-11-04", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 184, "data": "2025-11-05", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 185, "data": "2025-11-05", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 186, "data": "2025-11-06", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 187, "data": "2025-11-06", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 188, "data": "2025-11-08", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 189, "data": "2025-11-09", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 190, "data": "2025-11-13", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 191, "data": "2025-11-16", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 192, "data": "2025-11-22", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 193, "data": "2025-11-23", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 194, "data": "2025-11-23", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 195, "data": "2025-11-25", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 196, "data": "2025-11-25", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 197, "data": "2025-11-26", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 198, "data": "2025-11-30", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 199, "data": "2025-12-06", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 200, "data": "2025-12-07", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 201, "data": "2025-12-07", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 202, "data": "2025-12-08", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 203, "data": "2025-12-09", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 204, "data": "2025-12-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 205, "data": "2025-12-21", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 206, "data": "2025-12-22", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 207, "data": "2025-12-26", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 208, "data": "2025-12-27", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 209, "data": "2025-12-28", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 210, "data": "2025-12-28", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 211, "data": "2025-12-30", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 212, "data": "2026-01-01", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 213, "data": "2026-01-03", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 214, "data": "2026-01-04", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 215, "data": "2026-01-04", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 216, "data": "2026-01-07", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 217, "data": "2026-01-10", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 218, "data": "2026-01-12", "casa": "betClic", "tipo": "levantamento", "valor": 300.0, "epoca": "2025/26"}, {"id": 219, "data": "2026-01-18", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 220, "data": "2026-01-19", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 221, "data": "2026-01-20", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 222, "data": "2026-01-20", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 223, "data": "2026-01-21", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 224, "data": "2026-01-22", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 225, "data": "2026-01-22", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 226, "data": "2026-01-24", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 227, "data": "2026-01-25", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 228, "data": "2026-01-25", "casa": "Betano", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 229, "data": "2026-01-26", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 230, "data": "2026-01-28", "casa": "betClic", "tipo": "deposito", "valor": 30.0, "epoca": "2025/26"}, {"id": 231, "data": "2026-01-29", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 232, "data": "2026-01-29", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 233, "data": "2026-01-31", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 234, "data": "2026-01-31", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 235, "data": "2026-02-01", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 236, "data": "2026-02-07", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 237, "data": "2026-02-08", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 238, "data": "2026-02-08", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 239, "data": "2026-02-09", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 240, "data": "2026-02-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 241, "data": "2026-02-14", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 242, "data": "2026-02-15", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 243, "data": "2026-02-17", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 244, "data": "2026-02-18", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 245, "data": "2026-02-19", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 246, "data": "2026-02-21", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 247, "data": "2026-02-22", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 248, "data": "2026-02-25", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 249, "data": "2026-02-27", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 250, "data": "2026-02-28", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 251, "data": "2026-03-01", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 252, "data": "2026-03-02", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 253, "data": "2026-03-04", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 254, "data": "2026-03-07", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 255, "data": "2026-03-08", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 256, "data": "2026-03-08", "casa": "Betano", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 257, "data": "2026-03-10", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 258, "data": "2026-03-11", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 259, "data": "2026-03-12", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 260, "data": "2026-03-14", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 261, "data": "2026-03-15", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 262, "data": "2026-03-17", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 263, "data": "2026-03-18", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 264, "data": "2026-03-19", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 265, "data": "2026-03-22", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 266, "data": "2026-03-26", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 267, "data": "2026-04-05", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 268, "data": "2026-04-09", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 269, "data": "2026-04-11", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 270, "data": "2026-04-12", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 271, "data": "2026-04-13", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 272, "data": "2026-04-14", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 273, "data": "2026-04-15", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 274, "data": "2026-04-16", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 275, "data": "2026-04-17", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 276, "data": "2026-04-18", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 277, "data": "2026-04-19", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 278, "data": "2026-04-22", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 279, "data": "2026-04-25", "casa": "betClic", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 280, "data": "2026-04-26", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 281, "data": "2026-04-30", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 282, "data": "2026-05-01", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 283, "data": "2026-05-02", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 284, "data": "2026-05-03", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 285, "data": "2026-05-04", "casa": "betClic", "tipo": "deposito", "valor": 5.0, "epoca": "2025/26"}, {"id": 286, "data": "2026-05-05", "casa": "Betano", "tipo": "deposito", "valor": 20.0, "epoca": "2025/26"}, {"id": 287, "data": "2026-05-07", "casa": "betClic", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}, {"id": 288, "data": "2026-05-08", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 289, "data": "2026-05-09", "casa": "betClic", "tipo": "deposito", "valor": 15.0, "epoca": "2025/26"}, {"id": 290, "data": "2026-05-09", "casa": "Betano", "tipo": "deposito", "valor": 10.0, "epoca": "2025/26"}]};
+
+/* ---------- estado ---------- */
+const S = { casas:[], movs:[], season:'all', filterCasa:null, user:null, demo:!CFG.SB_ANON, editId:null };
+const eur = n => new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(n||0);
+const eur0 = n => new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
+const $ = s => document.querySelector(s);
+const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const MESESL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+/* ---------- época ---------- */
+function epocaDe(dateStr){
+  const d=new Date(dateStr+'T00:00:00'); const y=d.getFullYear();
+  const after=(d.getMonth()+1>CFG.SEASON_START.m)||(d.getMonth()+1===CFG.SEASON_START.m&&d.getDate()>=CFG.SEASON_START.d);
+  const ini=after?y:y-1; return ini+'/'+String(ini+1).slice(2);
+}
+function epocasDisponiveis(){
+  const set=new Set(S.movs.map(m=>epocaDe(m.data)));
+  return [...set].sort();
+}
+
+/* ---------- supabase ---------- */
+let _tok=null,_exp=0;
+async function sbAuthHeader(){
+  if(S.demo) return {};
+  if(_tok && Date.now()<_exp-60000) return {Authorization:'Bearer '+_tok};
+  // tenta refrescar a partir da sessão guardada na URL/hash (fluxo simples)
+  return _tok?{Authorization:'Bearer '+_tok}:{};
+}
+async function sb(path, {method='GET',body=null,write=false}={}){
+  const h={apikey:CFG.SB_ANON,'Content-Type':'application/json'};
+  Object.assign(h, await sbAuthHeader());
+  h[write?'Content-Profile':'Accept-Profile']=CFG.SCHEMA;
+  if(method!=='GET'&&!write) h['Accept-Profile']=CFG.SCHEMA;
+  if(write) h['Prefer']='return=representation';
+  const r=await fetch(CFG.SB_URL+'/rest/v1/'+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  if(!r.ok){const t=await r.text();throw new Error(r.status+' '+t)}
+  const txt=await r.text(); return txt?JSON.parse(txt):null;
+}
+
+/* ---------- carregar ---------- */
+async function load(){
+  if(S.demo){
+    if(!S.casas.length){ S.casas=structuredClone(SEED.casas); S.movs=structuredClone(SEED.movimentos); }
+    return;
+  }
+  const [casas,movs]=await Promise.all([
+    sb('casas?select=*&order=ordem'),
+    sb('movimentos?select=*&order=data.desc,id.desc')
+  ]);
+  S.casas=casas||[]; S.movs=movs||[];
+}
+
+/* ---------- cálculos ---------- */
+function movsFiltrados(){
+  let m=S.movs;
+  if(S.season!=='all') m=m.filter(x=>epocaDe(x.data)===S.season);
+  if(S.filterCasa) m=m.filter(x=>x.casa===S.filterCasa);
+  return m;
+}
+function totais(list){
+  let dep=0,lev=0;
+  list.forEach(m=>{ if(m.tipo==='deposito')dep+=+m.valor; else lev+=+m.valor; });
+  return {dep,lev};
+}
+function saldoTotal(){ return S.casas.reduce((a,c)=>a+(+c.saldo||0),0); }
+function casaStats(nome,season){
+  let list=S.movs.filter(m=>m.casa===nome);
+  if(season!=='all') list=list.filter(m=>epocaDe(m.data)===season);
+  const {dep,lev}=totais(list);
+  const casa=S.casas.find(c=>c.nome===nome);
+  const saldo=+(casa?.saldo||0);
+  return {dep,lev,saldo,resultado:lev+saldo-dep,nMov:list.length};
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  if(!S.demo && !S.user){ renderLogin(); return; }
+  const list=movsFiltrados();
+  const {dep,lev}=totais(list);
+  const saldo=saldoTotal();
+  const isAll=S.season==='all';
+  // resultado: com época específica mostramos fluxo (lev-dep); em "todas" incluímos saldo atual
+  const resultado = isAll ? (lev+saldo-dep) : (lev-dep);
+  const resLabel = isAll ? 'Resultado' : 'Fluxo da época';
+  const resCls = resultado>0.005?'pos':(resultado<-0.005?'neg':'');
+  const denom=Math.max(dep,lev+ (isAll?saldo:0),1);
+  const outW=Math.min(100,dep/denom*100), inW=Math.min(100,(lev+(isAll?saldo:0))/denom*100);
+
+  const seasons=epocasDisponiveis();
+  const tabs=['all',...seasons].map(s=>`<button class="stab ${S.season===s?'on':''}" onclick="setSeason('${s}')">${s==='all'?'Todas':s}</button>`).join('');
+
+  // casas
+  const casasH=S.casas.filter(c=>c.ativa!==false).map(c=>{
+    const st=casaStats(c.nome,S.season);
+    const rc=st.resultado>0.005?'pos':(st.resultado<-0.005?'neg':'z');
+    const active=S.filterCasa===c.nome;
+    const sign=st.resultado>-0.005?'+':'−';
+    return `<div class="casa" style="${active?'border-color:'+c.cor:''}" onclick="toggleCasa('${esc(c.nome)}')">
+      <div class="top"><span class="cdot" style="background:${c.cor}"></span><h3>${esc(c.nome)}</h3></div>
+      <div class="rl">Resultado</div>
+      <div class="res ${rc}">${sign}${eur0(Math.abs(st.resultado))}</div>
+      <div class="cfoot"><span class="o">${eur0(st.dep)}</span><span class="i">${eur0(st.lev)}</span></div>
+      <button class="salchip" onclick="event.stopPropagation();editSaldo('${esc(c.nome)}')">
+        Saldo<b class="${(+c.saldo)?'':'empty'}">${(+c.saldo)?eur0(c.saldo):'definir'}</b></button>
+    </div>`;
+  }).join('');
+
+  // movimentos agrupados por mês
+  let movH='';
+  if(list.length===0){
+    movH=`<div class="empty">Sem movimentos ${S.filterCasa?'em '+esc(S.filterCasa):'nesta época'}.<br>Toca no + para registar.</div>`;
+  }else{
+    const groups={};
+    list.forEach(m=>{const k=m.data.slice(0,7);(groups[k]??=[]).push(m)});
+    movH=Object.keys(groups).sort().reverse().map(k=>{
+      const [y,mo]=k.split('-'); const items=groups[k];
+      const {dep:gd,lev:gl}=totais(items);
+      const rows=items.map(m=>{
+        const c=S.casas.find(x=>x.nome===m.casa)||{cor:'#888'};
+        const dep=m.tipo==='deposito';
+        const dia=new Date(m.data+'T00:00:00').getDate();
+        return `<div class="mov" onclick="editMov(${m.id})">
+          <div class="ic ${dep?'dep':'lev'}">${dep?'↑':'↓'}</div>
+          <div class="mid">
+            <div class="l1"><span class="cc" style="background:${c.cor}"></span><span class="cn">${esc(m.casa)}</span></div>
+            <div class="l2">${dia} ${MESESL[+mo-1]} · ${dep?'Depósito':'Levantamento'}${m.nota?' · '+esc(m.nota):''}</div>
+          </div>
+          <div class="amt ${dep?'dep':'lev'}">${dep?'−':'+'}${eur0(m.valor)}</div>
+        </div>`;
+      }).join('');
+      const net=gl-gd;
+      return `<div class="month">
+        <div class="mh"><span class="mtitle">${MESESL[+mo-1]} ${y}</span>
+          <span class="mtot">${net>=0?'+':'−'}${eur0(Math.abs(net))}</span></div>
+        ${rows}</div>`;
+    }).join('');
+  }
+
+  const init = S.user?.email ? S.user.email[0].toUpperCase() : BALL;
+  const avatar = S.user?.avatar ? `<img src="${S.user.avatar}">` : init;
+
+  $('#app').innerHTML=`
+  <header>
+    <div class="hbar">
+      <div class="brand">
+        <div class="chip-suit">${BALL}</div>
+        <div><h1>Banca${S.demo?'<span class="demoBadge">demo</span>':''}</h1><small>Caderneta de apostas</small></div>
+      </div>
+      <button class="acct" onclick="acctMenu()">${avatar}</button>
+    </div>
+    <div class="seasons">${tabs}</div>
+  </header>
+  <div class="wrap">
+    <div class="hero">
+      <div class="lbl"><span>${resLabel}${S.season==='all'?'':' · '+S.season}</span>
+        <span class="mono" style="color:var(--brass)">${list.length} mov.</span></div>
+      <div class="big ${resCls}">${resultado>=0?'+':'−'}${eur(Math.abs(resultado)).replace('-','')}</div>
+      <div class="sub">${isAll?'Levantamentos + saldo atual − depósitos':'Levantamentos − depósitos nesta época'}</div>
+      <div class="flow"><i class="out" style="width:${outW}%"></i><i class="in" style="width:${inW}%"></i></div>
+      <div class="legend">
+        <div><span class="dot o"></span>Depositado <b>${eur0(dep)}</b></div>
+        <div><span class="dot i"></span>Levantado <b>${eur0(lev)}</b></div>
+        ${isAll?`<div><span class="dot s"></span>Saldo atual <b>${eur0(saldo)}</b></div>`:''}
+      </div>
+    </div>
+
+    <div class="sect"><span class="eyebrow">Por casa</span>
+      ${S.filterCasa?`<button class="link" onclick="toggleCasa(null)">Ver todas ✕</button>`:`<button class="link" onclick="gerirCasas()">Gerir</button>`}
+    </div>
+    <div class="casas">${casasH}</div>
+
+    <div class="sect"><span class="eyebrow">Movimentos${S.filterCasa?' · '+esc(S.filterCasa):''}</span></div>
+    ${movH}
+  </div>
+  <button class="fab" onclick="novoMov()">+</button>`;
+}
+
+function renderLogin(){
+  $('#app').innerHTML=`<div class="login"><div class="card">
+    <div class="chip-suit">${BALL}</div>
+    <h1>Banca</h1>
+    <p>A tua caderneta de depósitos e levantamentos nas casas de apostas. Privada, só tua.</p>
+    <button class="gbtn" onclick="googleLogin()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>
+      Entrar com Google
+    </button>
+    <div class="note">Acesso restrito a ${CFG.ADMIN_EMAIL}.</div>
+  </div></div>`;
+}
+
+/* ---------- ações UI ---------- */
+function esc(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]))}
+function setSeason(s){S.season=s;render()}
+function toggleCasa(n){S.filterCasa=(S.filterCasa===n)?null:n;render()}
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2000)}
+function openSheet(html){$('#sheet').innerHTML='<div class="grab"></div>'+html;$('#scrim').classList.add('on');$('#sheet').classList.add('on')}
+function closeSheet(){$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');S.editId=null}
+
+/* ----- novo / editar movimento ----- */
+let form={};
+function novoMov(){
+  form={data:new Date().toISOString().slice(0,10),casa:S.filterCasa||S.casas[0]?.nome,tipo:'deposito',valor:'',nota:''};
+  S.editId=null; renderForm('Novo movimento');
+}
+function editMov(id){
+  const m=S.movs.find(x=>x.id===id); if(!m)return;
+  form={data:m.data,casa:m.casa,tipo:m.tipo,valor:m.valor,nota:m.nota||''};
+  S.editId=id; renderForm('Editar movimento');
+}
+function renderForm(title){
+  const casasPick=S.casas.filter(c=>c.ativa!==false).map(c=>
+    `<button class="${form.casa===c.nome?'on':''}" onclick="form.casa='${esc(c.nome)}';renderForm('${title}')">
+      <span class="cd" style="background:${c.cor}"></span>${esc(c.nome)}</button>`).join('');
+  openSheet(`<h2>${title}</h2>
+    <div class="field"><label>Casa</label><div class="casaPick">${casasPick}</div></div>
+    <div class="field"><label>Tipo</label><div class="seg">
+      <button class="${form.tipo==='deposito'?'on dep':''}" onclick="form.tipo='deposito';renderForm('${title}')">↑ Depósito</button>
+      <button class="${form.tipo==='levantamento'?'on lev':''}" onclick="form.tipo='levantamento';renderForm('${title}')">↓ Levantamento</button>
+    </div></div>
+    <div class="row2">
+      <div class="field"><label>Valor (€)</label><input id="f_valor" type="number" inputmode="decimal" step="0.01" min="0" value="${form.valor}" placeholder="0,00"></div>
+      <div class="field"><label>Data</label><input id="f_data" type="date" value="${form.data}"></div>
+    </div>
+    <div class="field"><label>Nota (opcional)</label><input id="f_nota" type="text" value="${esc(form.nota||'')}" placeholder="ex: bónus, multipla…"></div>
+    <button class="btnP" onclick="saveMov()">Guardar</button>
+    ${S.editId?`<button class="btnGhost btnDel" onclick="delMov()">Eliminar movimento</button>`:''}
+    <button class="btnGhost" onclick="closeSheet()">Cancelar</button>`);
+  setTimeout(()=>{if(!form.valor)$('#f_valor')?.focus()},250);
+}
+async function saveMov(){
+  const valor=parseFloat($('#f_valor').value.replace(',','.'));
+  const data=$('#f_data').value, nota=$('#f_nota').value.trim();
+  if(!form.casa) return toast('Escolhe a casa');
+  if(!(valor>0)) return toast('Valor inválido');
+  if(!data) return toast('Falta a data');
+  const rec={data,casa:form.casa,tipo:form.tipo,valor:Math.round(valor*100)/100,nota:nota||null};
+  try{
+    if(S.editId){
+      if(S.demo){Object.assign(S.movs.find(m=>m.id===S.editId),rec)}
+      else await sb('movimentos?id=eq.'+S.editId,{method:'PATCH',body:rec,write:true});
+      toast('Movimento atualizado');
+    }else{
+      const id=nextId();
+      if(S.demo){S.movs.push({id,...rec})}
+      else await sb('movimentos',{method:'POST',body:{id,...rec},write:true});
+      toast('Movimento registado');
+    }
+    if(!S.demo) await load();
+    closeSheet(); render();
+  }catch(e){toast('Erro: '+e.message)}
+}
+function nextId(){return (S.movs.reduce((a,m)=>Math.max(a,m.id),0)||0)+1}
+async function delMov(){
+  if(!confirm('Eliminar este movimento?'))return;
+  try{
+    if(S.demo){S.movs=S.movs.filter(m=>m.id!==S.editId)}
+    else await sb('movimentos?id=eq.'+S.editId,{method:'DELETE',write:true});
+    toast('Eliminado'); closeSheet(); if(!S.demo)await load(); render();
+  }catch(e){toast('Erro: '+e.message)}
+}
+
+/* ----- saldo por casa ----- */
+function editSaldo(nome){
+  const c=S.casas.find(x=>x.nome===nome);
+  openSheet(`<h2>Saldo atual · ${esc(nome)}</h2>
+    <p style="color:var(--muted);font-size:13px;margin:-6px 0 16px">Quanto tens neste momento nesta casa. Entra no cálculo do resultado real.</p>
+    <div class="field"><label>Saldo (€)</label><input id="f_saldo" type="number" inputmode="decimal" step="0.01" min="0" value="${+c.saldo||''}" placeholder="0,00"></div>
+    <button class="btnP" onclick="saveSaldo('${esc(nome)}')">Guardar saldo</button>
+    <button class="btnGhost" onclick="closeSheet()">Cancelar</button>`);
+  setTimeout(()=>$('#f_saldo')?.focus(),250);
+}
+async function saveSaldo(nome){
+  const v=parseFloat(($('#f_saldo').value||'0').replace(',','.'))||0;
+  const body={saldo:Math.round(v*100)/100,saldo_em:new Date().toISOString()};
+  try{
+    if(S.demo){Object.assign(S.casas.find(c=>c.nome===nome),body)}
+    else await sb('casas?nome=eq.'+encodeURIComponent(nome),{method:'PATCH',body,write:true});
+    toast('Saldo atualizado'); closeSheet(); if(!S.demo)await load(); render();
+  }catch(e){toast('Erro: '+e.message)}
+}
+
+/* ----- gerir casas ----- */
+function gerirCasas(){
+  const rows=S.casas.map(c=>`<div class="mov">
+    <div class="ic" style="color:${c.cor}">●</div>
+    <div class="mid"><div class="cn">${esc(c.nome)}</div><div class="l2">${casaStats(c.nome,'all').nMov} movimentos</div></div>
+    <input type="color" value="${c.cor}" style="width:34px;height:34px;border:none;background:none;padding:0" onchange="setCor('${esc(c.nome)}',this.value)">
+  </div>`).join('');
+  openSheet(`<h2>Casas</h2>${rows}
+    <div class="field" style="margin-top:14px"><label>Adicionar casa</label><input id="f_casa" type="text" placeholder="Nome da casa"></div>
+    <button class="btnP" onclick="addCasa()">Adicionar</button>
+    <button class="btnGhost" onclick="closeSheet()">Fechar</button>`);
+}
+async function setCor(nome,cor){
+  if(S.demo){S.casas.find(c=>c.nome===nome).cor=cor}
+  else{try{await sb('casas?nome=eq.'+encodeURIComponent(nome),{method:'PATCH',body:{cor},write:true})}catch(e){}}
+}
+async function addCasa(){
+  const nome=$('#f_casa').value.trim(); if(!nome)return toast('Falta o nome');
+  if(S.casas.some(c=>c.nome===nome))return toast('Já existe');
+  const rec={nome,cor:'#8A93A6',ordem:(S.casas.reduce((a,c)=>Math.max(a,c.ordem||0),0))+1,ativa:true,saldo:0};
+  try{
+    if(S.demo){S.casas.push(rec)}
+    else await sb('casas',{method:'POST',body:rec,write:true});
+    toast('Casa adicionada'); closeSheet(); if(!S.demo)await load(); render();
+  }catch(e){toast('Erro: '+e.message)}
+}
+
+/* ----- conta ----- */
+function acctMenu(){
+  openSheet(`<h2>Conta</h2>
+    <p style="color:var(--muted);font-size:13.5px;margin:-6px 0 14px">
+      ${S.demo?'Modo demo — dados embebidos, alterações não são guardadas. Mete a anon key no CFG para ligar ao Supabase.':esc(S.user?.email||'')}</p>
+    ${S.demo?'':`<button class="btnGhost" onclick="logout()">Terminar sessão</button>`}
+    <button class="btnGhost" onclick="closeSheet()">Fechar</button>`);
+}
+
+/* ---------- auth (Google via Supabase) ---------- */
+function googleLogin(){
+  const redirect=location.origin+location.pathname;
+  location.href=`${CFG.SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirect)}`;
+}
+function logout(){_tok=null;_exp=0;S.user=null;location.hash='';closeSheet();render()}
+function parseAuthHash(){
+  if(!location.hash.includes('access_token'))return false;
+  const p=new URLSearchParams(location.hash.slice(1));
+  _tok=p.get('access_token'); _exp=Date.now()+(+p.get('expires_in')||3600)*1000;
+  history.replaceState(null,'',location.pathname);
+  return true;
+}
+async function fetchUser(){
+  try{
+    const r=await fetch(CFG.SB_URL+'/auth/v1/user',{headers:{apikey:CFG.SB_ANON,Authorization:'Bearer '+_tok}});
+    const u=await r.json();
+    if(u.email!==CFG.ADMIN_EMAIL){alert('Sem acesso a esta conta.');logout();return;}
+    S.user={email:u.email,avatar:u.user_metadata?.avatar_url};
+  }catch(e){_tok=null}
+}
+
+/* ---------- pull to refresh ---------- */
+let startY=0,pulling=false;
+addEventListener('touchstart',e=>{if(scrollY<=0){startY=e.touches[0].clientY;pulling=true}},{passive:true});
+addEventListener('touchmove',e=>{
+  if(!pulling)return; const dy=e.touches[0].clientY-startY;
+  if(dy>0&&scrollY<=0){const h=Math.min(dy*.5,70);$('#ptr').style.height=h+'px';$('#ptr').classList.toggle('pull',h>10)}
+},{passive:true});
+addEventListener('touchend',async()=>{
+  if(!pulling)return; pulling=false; const ptr=$('#ptr');
+  if(parseInt(ptr.style.height)>45){ptr.classList.add('go');ptr.style.height='44px';
+    try{await load()}catch(e){} render(); setTimeout(()=>{ptr.classList.remove('go','pull');ptr.style.height='0'},400);
+  }else{ptr.classList.remove('pull');ptr.style.height='0'}
+});
+
+/* ---------- arranque ---------- */
+(async function init(){
+  if(!S.demo){
+    if(parseAuthHash()) await fetchUser();
+    else { renderLogin(); /* sem token guardado, pede login */ }
+  }
+  try{ if(S.demo||S.user) await load(); }catch(e){ console.error(e); }
+  render();
+})();
+
+/* ---------- service worker ---------- */
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
+</script>
+</body>
+</html>
