@@ -1,5 +1,5 @@
 /* Controlo de Apostas — service worker */
-const CACHE = 'bc-v5';
+const CACHE = 'bc-v6';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

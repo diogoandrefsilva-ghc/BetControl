@@ -222,11 +222,15 @@ header{position:sticky;top:0;z-index:40;
   color:var(--brass);border:1px solid var(--brass-dim);border-radius:6px;padding:2px 6px;vertical-align:middle;font-family:'Space Grotesk';font-weight:600}
 
 /* ===== gráfico evolução ===== */
-.chartCasas{display:flex;flex-wrap:wrap;gap:7px;margin:2px 2px 13px}
-.chartCasas button{white-space:nowrap;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surf);
-  border:1px solid var(--line);color:var(--muted);font-family:'Space Grotesk';display:flex;align-items:center;gap:6px;transition:.15s}
-.chartCasas button .cd{width:8px;height:8px;border-radius:3px;flex:none}
-.chartCasas button.on{border-color:var(--brass);background:rgba(176,135,20,.12);color:var(--ivory)}
+/* filtro secundário segmentado (por casa / por mês) — distinto das sub-tabs */
+.subfilter{display:flex;gap:4px;background:var(--surf2);border:1px solid var(--line);border-radius:12px;
+  padding:4px;margin:2px 0 14px;box-shadow:inset 0 1px 2px rgba(40,50,45,.04)}
+.subfilter button{flex:1 1 0;min-width:0;padding:7px 4px;border-radius:9px;font-size:11px;font-weight:600;
+  color:var(--muted);font-family:'Space Grotesk';display:flex;align-items:center;justify-content:center;gap:5px;
+  white-space:nowrap;overflow:hidden;transition:.15s;line-height:1.1}
+.subfilter button .t{overflow:hidden;text-overflow:ellipsis}
+.subfilter button .cd{width:8px;height:8px;border-radius:3px;flex:none}
+.subfilter button.on{background:#fff;color:var(--ivory);box-shadow:0 1px 2px rgba(40,50,45,.06),0 2px 8px rgba(40,50,45,.08)}
 .chartCard{background:linear-gradient(165deg,#ffffff,var(--surf2));border:1px solid var(--line);border-radius:16px;
   padding:16px 14px 13px;box-shadow:0 1px 2px rgba(40,50,45,.04),0 6px 16px rgba(40,50,45,.05)}
 .chartScroll{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;padding-bottom:2px}
@@ -240,21 +244,20 @@ header{position:sticky;top:0;z-index:40;
 .bcol .blab{font-size:10.5px;color:var(--faint);font-family:'Space Grotesk';font-weight:600;white-space:nowrap;text-transform:capitalize}
 
 /* gráfico horizontal (meses no eixo vertical, montantes no horizontal) */
-.hchart{--lblw:50px;--gap:8px;margin-top:2px}
-.hbody{position:relative}
-.hlines{position:absolute;top:0;bottom:0;left:calc(var(--lblw) + var(--gap));right:0;z-index:0;pointer-events:none}
-.hlines i{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.7}
-.hrow{display:flex;align-items:center;gap:var(--gap);margin-bottom:9px;position:relative;z-index:1}
-.hrow .hlab{width:var(--lblw);flex:none;text-align:right;font-size:10.5px;color:var(--faint);
-  font-family:'Space Grotesk';font-weight:600;white-space:nowrap;text-transform:capitalize}
-.hbars{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
-.hbar{height:9px;border-radius:0 5px 5px 0;min-width:2px}
-.hbar.dep{background:linear-gradient(90deg,#e2675d,var(--neg))}
-.hbar.lev{background:linear-gradient(90deg,var(--pos),#2e8c47)}
-.hxaxis{position:relative;height:15px;margin-top:6px;margin-left:calc(var(--lblw) + var(--gap));
-  border-top:1px solid var(--line);padding-top:5px}
-.hxaxis span{position:absolute;top:5px;font-size:9.5px;color:var(--faint);
-  font-family:'IBM Plex Mono';white-space:nowrap;font-variant-numeric:tabular-nums}
+.hchart{--lblw:42px;--gap:8px;margin-top:2px}
+.hplot{position:relative}
+.hgrid{position:absolute;top:0;bottom:0;left:calc(var(--lblw) + var(--gap));right:0;z-index:0;pointer-events:none}
+.hgrid i{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.6}
+.hrow{display:grid;grid-template-columns:var(--lblw) 1fr;align-items:center;gap:var(--gap);margin-bottom:8px}
+.hrow .hlab{font-size:10px;color:var(--faint);text-align:right;font-family:'Space Grotesk';font-weight:600;
+  white-space:nowrap;text-transform:capitalize}
+.htrack{position:relative;height:20px;z-index:1}
+.hbar{position:absolute;left:0;height:8px;border-radius:0 4px 4px 0;min-width:2px}
+.hbar.dep{top:1px;background:linear-gradient(90deg,#e2675d,var(--neg))}
+.hbar.lev{bottom:1px;background:linear-gradient(90deg,var(--pos),#2e8c47)}
+.haxis{position:relative;height:13px;margin-top:4px;margin-left:calc(var(--lblw) + var(--gap))}
+.haxis span{position:absolute;top:0;font-size:9px;color:var(--faint);font-family:'IBM Plex Mono';
+  white-space:nowrap;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -388,21 +391,15 @@ function niceTicks(max,count=4){
   if(ticks[ticks.length-1]<max) ticks.push(ticks[ticks.length-1]+step);
   return ticks;
 }
-// filtro condensado por casa (quebra de linha, sem scroll horizontal)
+// filtro segmentado por casa (uma linha, sem scroll; toca de novo p/ limpar)
 function casaFilterH(){
-  return `<div class="chartCasas">
-    <button class="${!S.filterCasa?'on':''}" onclick="toggleCasa(null)">Todas</button>
-    ${S.casas.filter(c=>c.ativa!==false).map(c=>`<button class="${S.filterCasa===c.nome?'on':''}" onclick="toggleCasa('${esc(c.nome)}')"><span class="cd" style="background:${c.cor}"></span>${esc(c.nome)}</button>`).join('')}
-  </div>`;
+  return `<div class="subfilter">${S.casas.filter(c=>c.ativa!==false).map(c=>`<button class="${S.filterCasa===c.nome?'on':''}" onclick="toggleCasa('${esc(c.nome)}')"><span class="cd" style="background:${c.cor}"></span><span class="t">${esc(c.nome)}</span></button>`).join('')}</div>`;
 }
-// filtro condensado por mês (multi-seleção)
+// filtro segmentado por mês (multi-seleção, uma linha; mês a 2 dígitos)
 function mesFilterH(){
   const keys=mesesDisponiveis();
   if(!keys.length) return '';
-  return `<div class="chartCasas">
-    <button class="${!S.filterMeses.length?'on':''}" onclick="clearMeses()">Todos</button>
-    ${keys.map(k=>{const[y,mo]=k.split('-');return `<button class="${S.filterMeses.includes(k)?'on':''}" onclick="toggleMes('${k}')">${MESES[+mo-1]} ’${y.slice(2)}</button>`}).join('')}
-  </div>`;
+  return `<div class="subfilter">${keys.map(k=>`<button class="${S.filterMeses.includes(k)?'on':''}" onclick="toggleMes('${k}')">${k.slice(5)}</button>`).join('')}</div>`;
 }
 function mesesResumo(list){
   // agrupa por YYYY-MM e devolve {key,y,mo,dep,lev,net,n} ordenado do mais recente p/ o mais antigo
@@ -484,21 +481,20 @@ function render(){
       const prev=i>0?chartMeses[i-1]:null;
       const showY=i===0||(prev&&prev.y!==m.y);
       const lab=MESES[m.mo-1]+(showY?` ’${String(m.y).slice(2)}`:'');
-      const dw=m.dep>0?Math.max(1.5,m.dep/axisMax*100):0;
-      const lw=m.lev>0?Math.max(1.5,m.lev/axisMax*100):0;
+      const dw=Math.max(1.5,m.dep/axisMax*100), lw=Math.max(1.5,m.lev/axisMax*100);
       const tip=`${MESESL[m.mo-1]} ${m.y}`;
       return `<div class="hrow"><span class="hlab">${lab}</span>
-        <div class="hbars">
-          <div class="hbar dep" style="width:${dw}%" title="${tip} · Depositado ${eur0(m.dep)}"></div>
-          <div class="hbar lev" style="width:${lw}%" title="${tip} · Levantado ${eur0(m.lev)}"></div>
+        <div class="htrack">
+          ${m.dep>0?`<div class="hbar dep" style="width:${dw}%" title="${tip} · Depositado ${eur0(m.dep)}"></div>`:''}
+          ${m.lev>0?`<div class="hbar lev" style="width:${lw}%" title="${tip} · Levantado ${eur0(m.lev)}"></div>`:''}
         </div></div>`;
     }).join('');
     chartH=`<div class="chartCard">
       <div class="hchart">
-        <div class="hbody"><div class="hlines">${lines}</div>${rows}</div>
-        <div class="hxaxis">${xlabs}</div>
+        <div class="hplot"><div class="hgrid">${lines}</div>${rows}</div>
+        <div class="haxis">${xlabs}</div>
       </div>
-      <div class="legend" style="margin-top:8px;justify-content:center">
+      <div class="legend" style="margin-top:10px;justify-content:center">
         <div><span class="dot o"></span>Depositado <b>${eur0(dep)}</b></div>
         <div><span class="dot i"></span>Levantado <b>${eur0(lev)}</b></div>
       </div>
@@ -622,7 +618,6 @@ function applySeasonDefault(){
 }
 function toggleCasa(n){S.filterCasa=(S.filterCasa===n)?null:n;render()}
 function toggleMes(k){const i=S.filterMeses.indexOf(k);if(i>=0)S.filterMeses.splice(i,1);else S.filterMeses.push(k);render()}
-function clearMeses(){S.filterMeses=[];render()}
 let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2000)}
 function openSheet(html){$('#sheet').innerHTML='<div class="grab"></div>'+html;$('#scrim').classList.add('on');$('#sheet').classList.add('on')}
