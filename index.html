@@ -252,12 +252,13 @@ header{position:sticky;top:0;z-index:40;
 .hrow .hlab{font-size:10px;color:var(--faint);text-align:right;font-family:'Space Grotesk';font-weight:600;
   white-space:nowrap;text-transform:capitalize}
 .htrack{position:relative;height:20px;z-index:1}
-.hbar{position:absolute;left:0;height:8px;border-radius:0 4px 4px 0;min-width:2px}
-.hbar.dep{top:1px;background:linear-gradient(90deg,#e2675d,var(--neg))}
-.hbar.lev{bottom:1px;background:linear-gradient(90deg,var(--pos),#2e8c47)}
-.haxis{position:relative;height:13px;margin-top:4px;margin-left:calc(var(--lblw) + var(--gap))}
+.hb{position:absolute;left:0;height:8px;border-radius:0 4px 4px 0;min-width:2px}
+.hb.dep{top:1px;background:linear-gradient(90deg,#e2675d,var(--neg))}
+.hb.lev{bottom:1px;background:linear-gradient(90deg,var(--pos),#2e8c47)}
+.haxis{position:relative;height:13px;margin-bottom:6px;margin-left:calc(var(--lblw) + var(--gap))}
 .haxis span{position:absolute;top:0;font-size:9px;color:var(--faint);font-family:'IBM Plex Mono';
   white-space:nowrap;font-variant-numeric:tabular-nums}
+.subfilter.mesf button{font-size:10px;padding:7px 2px;gap:0}
 </style>
 </head>
 <body>
@@ -399,7 +400,7 @@ function casaFilterH(){
 function mesFilterH(){
   const keys=mesesDisponiveis();
   if(!keys.length) return '';
-  return `<div class="subfilter">${keys.map(k=>`<button class="${S.filterMeses.includes(k)?'on':''}" onclick="toggleMes('${k}')">${k.slice(5)}</button>`).join('')}</div>`;
+  return `<div class="subfilter mesf">${keys.map(k=>`<button class="${S.filterMeses.includes(k)?'on':''}" onclick="toggleMes('${k}')">${MESES[+k.slice(5)-1]}</button>`).join('')}</div>`;
 }
 function mesesResumo(list){
   // agrupa por YYYY-MM e devolve {key,y,mo,dep,lev,net,n} ordenado do mais recente p/ o mais antigo
@@ -485,14 +486,14 @@ function render(){
       const tip=`${MESESL[m.mo-1]} ${m.y}`;
       return `<div class="hrow"><span class="hlab">${lab}</span>
         <div class="htrack">
-          ${m.dep>0?`<div class="hbar dep" style="width:${dw}%" title="${tip} · Depositado ${eur0(m.dep)}"></div>`:''}
-          ${m.lev>0?`<div class="hbar lev" style="width:${lw}%" title="${tip} · Levantado ${eur0(m.lev)}"></div>`:''}
+          ${m.dep>0?`<div class="hb dep" style="width:${dw}%" title="${tip} · Depositado ${eur0(m.dep)}"></div>`:''}
+          ${m.lev>0?`<div class="hb lev" style="width:${lw}%" title="${tip} · Levantado ${eur0(m.lev)}"></div>`:''}
         </div></div>`;
     }).join('');
     chartH=`<div class="chartCard">
       <div class="hchart">
-        <div class="hplot"><div class="hgrid">${lines}</div>${rows}</div>
         <div class="haxis">${xlabs}</div>
+        <div class="hplot"><div class="hgrid">${lines}</div>${rows}</div>
       </div>
       <div class="legend" style="margin-top:10px;justify-content:center">
         <div><span class="dot o"></span>Depositado <b>${eur0(dep)}</b></div>
