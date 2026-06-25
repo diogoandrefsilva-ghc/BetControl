@@ -398,7 +398,8 @@ function casaFilterH(){
 }
 // filtro segmentado por mês (multi-seleção, uma linha; mês a 2 dígitos)
 function mesFilterH(){
-  const keys=mesesDisponiveis();
+  // ordem cronológica (progressão da época): jul → jun
+  const keys=mesesDisponiveis().slice().reverse();
   if(!keys.length) return '';
   return `<div class="subfilter mesf">${keys.map(k=>`<button class="${S.filterMeses.includes(k)?'on':''}" onclick="toggleMes('${k}')">${MESES[+k.slice(5)-1]}</button>`).join('')}</div>`;
 }
