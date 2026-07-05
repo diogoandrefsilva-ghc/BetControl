@@ -1,4 +1,4 @@
-/* Controlo de Apostas — service worker */
+/* Bet Control - Controlo de Apostas — service worker */
 const CACHE = 'bc-v12';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
