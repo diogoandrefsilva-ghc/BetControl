@@ -643,7 +643,12 @@ function openSheet(html){$('#sheet').innerHTML='<div class="grab"></div>'+html;$
 function closeSheet(){$('#scrim').classList.remove('on');$('#sheet').classList.remove('on');S.editId=null}
 
 /* ----- novo / editar movimento ----- */
-let form={};
+let form={}, formTitle='';
+/* nota: num onclick inline, "form" resolve para button.form (null) → usar sempre setForm() */
+function setForm(k,v){
+  form.valor=$('#f_valor').value; form.data=$('#f_data').value; form.nota=$('#f_nota').value;
+  form[k]=v; renderForm(formTitle);
+}
 function novoMov(){
   form={data:new Date().toISOString().slice(0,10),casa:S.filterCasa||S.casas[0]?.nome,tipo:'deposito',valor:'',nota:''};
   S.editId=null; renderForm('Novo movimento');
@@ -654,14 +659,15 @@ function editMov(id){
   S.editId=id; renderForm('Editar movimento');
 }
 function renderForm(title){
+  formTitle=title;
   const casasPick=S.casas.filter(c=>c.ativa!==false).map(c=>
-    `<button class="${form.casa===c.nome?'on':''}" onclick="form.casa='${esc(c.nome)}';renderForm('${title}')">
+    `<button class="${form.casa===c.nome?'on':''}" onclick="setForm('casa','${esc(c.nome)}')">
       <span class="cd" style="background:${c.cor}"></span>${esc(c.nome)}</button>`).join('');
   openSheet(`<h2>${title}</h2>
     <div class="field"><label>Casa</label><div class="casaPick">${casasPick}</div></div>
     <div class="field"><label>Tipo</label><div class="seg">
-      <button class="${form.tipo==='deposito'?'on dep':''}" onclick="form.tipo='deposito';renderForm('${title}')">↑ Depósito</button>
-      <button class="${form.tipo==='levantamento'?'on lev':''}" onclick="form.tipo='levantamento';renderForm('${title}')">↓ Levantamento</button>
+      <button class="${form.tipo==='deposito'?'on dep':''}" onclick="setForm('tipo','deposito')">↑ Depósito</button>
+      <button class="${form.tipo==='levantamento'?'on lev':''}" onclick="setForm('tipo','levantamento')">↓ Levantamento</button>
     </div></div>
     <div class="row2">
       <div class="field"><label>Valor (€)</label><input id="f_valor" type="number" inputmode="decimal" step="0.01" min="0" value="${form.valor}" placeholder="0,00"></div>
