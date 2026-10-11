@@ -1,5 +1,5 @@
 /* Bet Control - Controlo de Apostas — service worker */
-const CACHE = 'bc-v12';
+const CACHE = 'bc-v13';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
